@@ -143,6 +143,7 @@
   };
 
   var el = {
+    backdrop: document.getElementById("backdrop"),
     stage: document.getElementById("stage"),
     wallpaper: document.getElementById("wallpaper"),
     wallpaperDim: document.getElementById("wallpaper-dim"),
@@ -531,8 +532,7 @@
     { section: "CONTROLS" },
     { key: "wifi", label: "Network", icon: "icons/wifi-on.svg" },
     { key: "settings", label: "TV Settings", icon: "icons/gear.svg" },
-    { key: "diag", label: "Diagnostics", icon: "icons/diag.svg" },
-    { key: "home", label: "Samsung Home", icon: "icons/home.svg" }
+    { key: "diag", label: "Diagnostics", icon: "icons/diag.svg" }
   ];
   function visibleControls() {
     return CONTROLS.filter(function (item) {
@@ -556,7 +556,7 @@
       if (item.key === "family-carousel" && !familyWallpaperIndexes().length) return;
       var i = selectableIndex++;
       var row = document.createElement("div");
-      row.className = "ctrl-item" + (item.key === "home" ? " home-link" : "") +
+      row.className = "ctrl-item" +
         (i === state.controlsIndex ? " focus" : "") +
         (controlConnected(item) ? " connected" : "");
       if (item.icon) {
@@ -631,7 +631,6 @@
       return;
     }
     if (item.key === "diag") { sdkDiag(); return; }
-    if (item.key === "home") { launch({ id: SAMSUNG_HOME, name: "Samsung Home" }); return; }
   }
 
   var store = loadStore();
@@ -728,7 +727,7 @@
   function applyTheme() {
     var theme = themeFor(store.theme);
     state.columns = theme.columns;
-    el.stage.className = "stage" + (theme.aurora ? " aurora" : "");
+    el.backdrop.className = "backdrop" + (theme.aurora ? " aurora" : "");
     el.grid.style.gridTemplateColumns = "repeat(" + theme.columns + ", 160px)";
     saveStore();
   }
@@ -968,6 +967,7 @@
     var selectedKey = utils[state.utilIndex] && utils[state.utilIndex].key;
     utils = [];
     if (WALLPAPERS.length > 1) utils.push({ key: "wall", label: "Wallpaper" });
+    utils.push({ key: "home", label: "Samsung Home" });
     utils.push({ key: "controls", label: "Settings" });
     for (var selectedIndex = 0; selectedIndex < utils.length; selectedIndex++) {
       if (utils[selectedIndex].key === selectedKey) { state.utilIndex = selectedIndex; break; }
@@ -981,11 +981,11 @@
       chip.className = "chip";
       node.appendChild(chip);
       if (util.key === "controls") {
-        var gear = document.createElement("img");
-        gear.className = "util-gear";
-        gear.alt = "";
-        gear.src = "icons/gear.svg";
-        node.appendChild(gear);
+        var icon = document.createElement("img");
+        icon.className = "util-gear";
+        icon.alt = "";
+        icon.src = "icons/gear.svg";
+        node.appendChild(icon);
       } else {
         var label = document.createElement("span");
         label.textContent = util.label;
@@ -1772,6 +1772,7 @@
       var util = utils[state.utilIndex];
       if (util.key === "music") { openMusic(); return; }
       if (util.key === "wall") { openWallPicker(); return; }
+      if (util.key === "home") { launch({ id: SAMSUNG_HOME, name: "Samsung Home" }); return; }
       if (util.key === "controls") { openControls(); return; }
       return;
     }
@@ -1874,13 +1875,13 @@
       if (key === 37) state.sourceIndex--;
       if (key === 39) state.sourceIndex = Math.min(sourceItems().length - 1, state.sourceIndex + 1);
       if (key === 37 || key === 39) state.hdmiMenuDismissed = false;
-      if (key === 38) { state.returnZone = "sources"; state.zone = "utils"; state.utilIndex = 0; }
+      if (key === 38) { state.returnZone = "sources"; state.zone = "utils"; state.utilIndex = utils.length - 1; }
       paintFocus();
       return;
     }
 
     if (state.zone === "card") {
-      if (key === 38) { state.returnZone = "dock"; state.zone = "utils"; state.utilIndex = 0; }
+      if (key === 38) { state.returnZone = "dock"; state.zone = "utils"; state.utilIndex = utils.length - 1; }
       if (key === 40) state.zone = "dock";
       paintFocus();
       return;
@@ -1913,7 +1914,7 @@
     if (key === 38) {
       state.returnZone = "dock";
       if (np && np.title) state.zone = "card";
-      else { state.zone = "utils"; state.utilIndex = 0; }
+      else { state.zone = "utils"; state.utilIndex = utils.length - 1; }
     }
     if (key === 40) return;
     paintFocus();
@@ -2362,6 +2363,7 @@
   /* Samsung components that use store-style package ids and must not be
    * mistaken for apps the viewer installed. */
   var HIDE_IDS = [
+    "2022ePop01.SmartTV", // 2022.SmartTV.Pontus (ePOP package)
     "adplatform.ADPlayer",
     "aQjWjLsPaO.MultiScreenWebLauncher",
     "NRi6kdBYJ0.AirPlayWebApp",
