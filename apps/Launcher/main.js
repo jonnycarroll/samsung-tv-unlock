@@ -48,6 +48,7 @@
 
   var DIAGNOSTICS = false; // in-app perf/dump beacons; off in normal builds
   var SELF = "tvunlock02.Launcher";
+  var APPLE_TV_APP = "com.samsung.tv.aria-video";
   var SETTINGS_APP = "com.samsung.tv.coba.setting";
   var SAMSUNG_HOME = "com.samsung.tv.csfs";
   var NETWORK_SETTINGS = "org.tizen.NetworkSetting-Tizen";
@@ -774,7 +775,7 @@
     if (/-dummy$/.test(app.id)) return false;
 
     // The TV's own "show in the app list" flag is the best first filter.
-    if (app.show === false || app.show === "false") return false;
+    if ((app.show === false || app.show === "false") && app.id !== APPLE_TV_APP) return false;
 
     // Known brands always pass, whatever shape their id has.
     if (isKnownBrand(app.name)) return true;
@@ -2355,6 +2356,7 @@
   /* Samsung apps worth keeping in All apps. Everything else Samsung ships is
    * hidden behind the "Show all apps" tile. */
   var SAMSUNG_KEEP = [
+    APPLE_TV_APP,
     "com.samsung.tv.gallery",
     "org.tizen.ambientapp",
     "com.samsung.tv.coba.livetv"
@@ -2437,7 +2439,7 @@
     return dedupeBrands(state.apps.filter(isCurated));
   }
 
-  var APPS_CACHE = "cleanhome.apps.v1";
+  var APPS_CACHE = "cleanhome.apps.v2";
   var CACHE_MAX_AGE = 6 * 60 * 60 * 1000;
 
   function readAppsCache() {
