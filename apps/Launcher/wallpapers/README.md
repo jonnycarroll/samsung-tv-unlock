@@ -10,5 +10,5 @@ To populate them:
    with a `<id>.jpg` thumbnail, where `<id>` matches `wallpapers.json`.
 2. Or re-run the inventory scraper that produced `wallpapers.json`.
 
-The app is designed to default to the **aurora** theme, so it works with zero
-wallpapers present.
+The app defaults to the **Obsidian** gradient, so it works with zero wallpapers
+present. **Aurora** is the brighter alternative in Settings.

@@ -1812,6 +1812,7 @@
     state.grid = visibleApps();
     state.gridIndex = 0;
     el.homeRow.hidden = true;
+    el.utils.hidden = true;
     el.rail.hidden = true;
     el.gridViewport.hidden = false;
     el.grid.style.transform = "";
@@ -1826,6 +1827,7 @@
     state.returnZone = "dock";
     el.gridViewport.hidden = true;
     el.homeRow.hidden = false;
+    el.utils.hidden = false;
     el.dock.hidden = false;
     el.rail.hidden = true;
     el.grid.style.transform = "";
@@ -2493,6 +2495,15 @@
   }
 
   function adopt(apps) {
+    // Older cold starts could save preview-only numeric IDs before the TV's
+    // real app list arrived. Replace that dock with actual installed apps.
+    if (hasTizen() && store.dock.some(function (id) {
+      return DEMO_APPS.some(function (demo) { return demo.id === id && /^\d+$/.test(id); });
+    })) {
+      store.dock = [];
+      store.seeded = false;
+      store.dockOrder = false;
+    }
     if (!store.allReset) {
       store.showAll = false;
       store.allReset = true;
@@ -2575,9 +2586,12 @@
       return;
     }
 
-    // Keep the launcher interactive immediately on a cold install. The TV's
-    // app enumeration is slow and can monopolize the UI thread for seconds.
-    adopt(DEMO_APPS.slice());
+    // Show the empty Home actions while the TV enumerates its real apps.
+    // Preview apps are only for browsers without the Tizen API.
+    renderUtils();
+    renderDock();
+    renderGrid();
+    paintFocus();
     setTimeout(fetchApps, 120);
   }
 

@@ -36,16 +36,20 @@ html, body {
 .bg {
   position: absolute; left: 0; top: 0;
   width: 100%; height: 100%;
-  background: #000000;
-  transition: background 400ms linear;
-}
-
-/* Aurora: teal and violet on navy, darker at the bottom. */
-.aurora .bg {
   background:
     radial-gradient(900px 620px at 20% 8%, rgba(45, 212, 191, 0.22), transparent 62%),
     radial-gradient(900px 640px at 82% 4%, rgba(139, 92, 246, 0.26), transparent 64%),
     linear-gradient(178deg, #0b1220 0%, #070a14 52%, #04060c 100%);
+  transition: background 400ms linear;
+}
+
+/* Aurora: red, green and blue light over midnight blue. */
+.aurora .bg {
+  background:
+    radial-gradient(1000px 760px at 15% 12%, rgba(42, 214, 113, 0.42), transparent 68%),
+    radial-gradient(1040px 780px at 84% 5%, rgba(244, 69, 91, 0.42), transparent 68%),
+    radial-gradient(800px 650px at 55% 85%, rgba(46, 119, 255, 0.42), transparent 72%),
+    linear-gradient(160deg, #0a2347 0%, #0b1b3d 48%, #07142e 100%);
 }
 .bg::after {
   content: "";
@@ -53,6 +57,9 @@ html, body {
   width: 100%; height: 100%;
   background:
     linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.05) 42%, rgba(0,0,0,0.62) 100%);
+}
+.aurora .bg::after {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.14), transparent 42%, rgba(0,0,0,0.32));
 }
 
 /* Ambient colour of the focused app, felt rather than seen. */
@@ -65,6 +72,9 @@ html, body {
   z-index: 3;
   opacity: 0.9;
   background: radial-gradient(ellipse at 50% 100%, rgba(90, 124, 255, 0.14), transparent 66%);
+}
+.aurora .glow {
+  background: radial-gradient(ellipse at 50% 100%, rgba(46, 119, 255, 0.24), transparent 68%);
 }
 
 /* ---- clock ---- */
@@ -80,6 +90,7 @@ html, body {
 
 /* ---- utilities ---- */
 .utils { position: absolute; right: 96px; top: 64px; display: flex; }
+.utils[hidden] { display: none; }
 .util {
   position: relative;
   height: 64px; padding: 0 26px;
@@ -265,7 +276,7 @@ html, body {
 
 /* ---- grid ---- */
 .grid-viewport {
-  position: absolute; left: 96px; top: 300px;
+  position: absolute; left: 96px; top: 335px;
   width: 1728px; height: 710px; overflow: hidden;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,0.08) 125px, rgba(0,0,0,0.45) 155px, #000 175px);
   mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,0.08) 125px, rgba(0,0,0,0.45) 155px, #000 175px);
