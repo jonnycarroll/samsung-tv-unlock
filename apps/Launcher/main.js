@@ -1101,6 +1101,12 @@
     el.sourcesPlate.className = "plate";
     el.sources.appendChild(el.sourcesPlate);
     if (state.zone === "sources") paintFocus();
+    else if (state.view === "home" && state.zone === "dock") {
+      // The centered home row moves when an HDMI tile is added or removed.
+      // Reposition its shared highlight even though the focused app tile is unchanged.
+      var focused = el.dock.querySelectorAll(".tile")[state.dockIndex];
+      if (focused) moveHomePlate(focused, true);
+    }
   }
 
   function renderDock() {
@@ -1167,9 +1173,9 @@
     plate.style.opacity = "1";
   }
 
-  function moveHomePlate(tile) {
+  function moveHomePlate(tile, force) {
     var plate = el.homePlate;
-    if (!plate || plate._tile === tile) return;
+    if (!plate || (plate._tile === tile && !force)) return;
     plate._tile = tile;
     if (!tile) { plate.style.opacity = "0"; return; }
     var row = el.homeRow.getBoundingClientRect();
