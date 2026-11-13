@@ -40,7 +40,13 @@ sdb connect <TV_IP>:26101
 PROFILE=<their-cert-profile> tools/deploy-launcher.sh
 ~~~
 
-`PROFILE` defaults to `peregrine-samsung`; it must name their certificate profile.
+`PROFILE` must name your own Samsung TV certificate profile. The
+`peregrine-samsung` name was specific to the original author's machine and is
+not included with Tizen Studio. Create a profile in Tizen Studio Certificate
+Manager: choose **Samsung → TV**, create or import an author certificate, then
+create a **Public** distributor certificate containing your TV's DUID. A
+standalone `tizen certificate` command only creates an author certificate and is
+insufficient for installation on a Samsung TV.
 The package id is `tvunlock02.Launcher`; if that collides with an installed app,
 change `package` in `apps/Launcher/config.xml` and `APP_ID` in the deploy script.
 

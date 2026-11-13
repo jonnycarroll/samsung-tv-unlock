@@ -54,9 +54,10 @@
   var SOURCE_APP = "com.samsung.tv.coba.source";
   var LIVETV_APP = "com.samsung.tv.coba.livetv";
   var STORE_KEY = "cleanhome.v2";
-  var MAX_DOCK = 9;
-  var GRID_COLS = 5;
-  var ROW_H = 158;
+  var MAX_DOCK = 5;
+  var DEFAULT_DOCK_COUNT = 4;
+  var GRID_COLS = 6;
+  var ROW_H = 178;
 
   var INTERNAL_IDS = [
     "adplatform.ADPlayer", "WykOS4t4F0.cmsWebApp", "25emanual3.emanual",
@@ -79,12 +80,10 @@
   /* The dock the viewer asked for. Ids first, names as a fallback. */
   var DEFAULT_IDS = [
     "9Ur5IzDKqV.TizenYouTube", "org.tizen.netflix-app", "org.tizen.primevideo",
-    "CXNLCPYe82.dstvnow", "rJeHak5zRg.Spotify", "kIciSQlYEM.plex", "org.tizen.browser",
-    "com.samsung.tv.coba.livetv"
+    "CXNLCPYe82.dstvnow", "rJeHak5zRg.Spotify", "kIciSQlYEM.plex", "org.tizen.browser"
   ];
   var DEFAULT_NAMES = [
-    "YouTube", "Netflix", "Prime Video", "DStv Stream", "Spotify", "Plex", "Internet",
-    "LiveTV"
+    "YouTube", "Netflix", "Prime Video", "DStv Stream", "Spotify", "Plex", "Internet"
   ];
 
   var BRANDS = [
@@ -100,9 +99,8 @@
 
   /* Theme presets, after cleanyourtv's theme folders. */
   var THEMES = [
-    { id: "obsidian", name: "Obsidian", aurora: false, columns: 5 },
-    { id: "aurora", name: "Aurora", aurora: true, columns: 5 },
-    { id: "six", name: "Six columns", aurora: false, columns: 6 }
+    { id: "obsidian", name: "Obsidian", aurora: false, columns: 6 },
+    { id: "aurora", name: "Aurora", aurora: true, columns: 6 }
   ];
 
   var state = {
@@ -123,7 +121,7 @@
     holdTimer: null,
     holdFired: false,
     suppressActivate: false,
-    columns: 5,
+    columns: 6,
     zone: "dock",
     dockIndex: 0,
     utilIndex: 0,
@@ -132,6 +130,9 @@
     wifiSsid: "",
     wifiStatus: "",
     videoSources: null,
+    videoWindowOpen: false,
+    sourceIndex: 0,
+    returnZone: "dock",
     gridIndex: 0,
     apps: [],
     dock: [],
@@ -160,7 +161,12 @@
     subStack: document.getElementById("sub-stack"),
     dock: document.getElementById("dock"),
     dockPlate: document.getElementById("dock-plate"),
+    homeRow: document.getElementById("home-row"),
+    homePlate: document.getElementById("home-plate"),
+    sources: document.getElementById("sources"),
+    sourcesPlate: document.getElementById("sources-plate"),
     gridPlate: document.getElementById("grid-plate"),
+    gridViewport: document.getElementById("grid-viewport"),
     rail: document.getElementById("rail"),
     grid: document.getElementById("grid"),
     empty: document.getElementById("empty"),
@@ -197,14 +203,9 @@
   var PAUSE_ICON = '<svg viewBox="0 0 24 24" width="30" height="30" fill="#f3f5f8"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
   var np = null;
   var npTimer = null;
+  var gridFadeTimer = null;
 
-  // ---- live wallpaper (test) ----
-  var WALLPAPERS = [
-    { id: "off", name: "Off" },
-    { id: "batman", name: "Batman", file: "wallpapers/batman.mp4", thumb: "wallpapers/thumbs/batman.jpg" },
-    { id: "batman-mono", name: "Batman Mono", file: "wallpapers/batman-mono.mp4", thumb: "wallpapers/thumbs/batman-mono.jpg" },
-    { id: "pixel-rain", name: "Pixel Rain", file: "wallpapers/pixel-rain.mp4", thumb: "wallpapers/thumbs/pixel-rain.jpg" }
-  ];
+  var WALLPAPERS = [{ id: "off", name: "Off" }];
   var wallpaperIndex = 0;
   var stillActive = 0;
   var stillLoadToken = 0;
@@ -301,7 +302,7 @@
     try { localStorage.setItem("tv-wallpaper", wp.id); } catch (e) {}
     if (isFamilyWallpaper(wp) && state.familyCarousel && !options.fromCarousel) scheduleFamilyCarousel();
     renderControls();
-    toast("Wallpaper: " + wp.name);
+    if (!options.quiet) toast("Wallpaper: " + wp.name);
   }
   function cycleWallpaper(dir) { setWallpaper(wallpaperIndex + (dir || 1)); }
   function probeToast(msg) {
@@ -401,7 +402,7 @@
     try { id = localStorage.getItem("tv-wallpaper") || ""; } catch (e) {}
     if (!id) return false;
     for (var i = 0; i < WALLPAPERS.length; i++) {
-      if (WALLPAPERS[i].id === id) { setWallpaper(i); return true; }
+      if (WALLPAPERS[i].id === id) { setWallpaper(i, { quiet: true }); return true; }
     }
     return false;
   }
@@ -412,7 +413,7 @@
     if (!enabled || !indexes.length) return;
     state.familyCarousel = true;
     if (!isFamilyWallpaper(WALLPAPERS[wallpaperIndex])) {
-      setWallpaper(indexes[0], { fromCarousel: true });
+      setWallpaper(indexes[0], { fromCarousel: true, quiet: true });
     } else {
       scheduleFamilyCarousel();
     }
@@ -423,21 +424,12 @@
       if (settled) return;
       settled = true;
       if (applySavedWallpaper()) { restoreFamilyCarousel(); return; }
-      if (hasTizen()) { setWallpaper(0); return; }
-      // Browser preview: start on one of the bundled wallpapers, not black.
-      var pick = 1;
-      for (var i = 0; i < WALLPAPERS.length; i++) {
-        if (WALLPAPERS[i].id === "crimson-bonsai-minimalist") { pick = i; break; }
-      }
-      setWallpaper(pick);
+      setWallpaper(0, { quiet: true });
     }
     fetch("wallpapers.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (list) {
       if (!Array.isArray(list) || !list.length) { settle(); return; }
-      var off = WALLPAPERS.filter(function (w) { return !w.file; });
-      var known = {}; WALLPAPERS.forEach(function (w) { known[w.id] = true; });
-      var extra = list.filter(function (w) { return w && w.file && !known[w.id]; })
-        .map(function (w) { return { id: w.id, name: w.name || w.id, file: w.file, thumb: w.thumb, category: w.category }; });
-      if (extra.length) WALLPAPERS = off.concat(WALLPAPERS.filter(function (w) { return w.file; }), extra);
+      WALLPAPERS = [{ id: "off", name: "Off" }].concat(list.filter(function (w) { return w && w.file; })
+        .map(function (w) { return { id: w.id, name: w.name || w.id, file: w.file, thumb: w.thumb, category: w.category, still: w.still }; }));
       try {
         if (hasTizen() && !localStorage.getItem("family-wallpapers-v1")) {
           localStorage.setItem("tv-wallpaper", "family-david-liz-2");
@@ -445,6 +437,11 @@
         }
       } catch (e) {}
       if (state.wallOpen) renderWallPicker();
+      renderUtils();
+      if (state.zone === "utils") {
+        state.utilIndex = Math.min(state.utilIndex, utils.length - 1);
+        paintFocus();
+      }
       restoreFamilyCarousel();
       settle();
     }).catch(settle);
@@ -520,47 +517,44 @@
     closeWallPicker();
   }
 
-  var utils = [
-    { key: "all", label: "All apps" },
-    { key: "refresh", label: "Refresh" },
-    { key: "edit", label: "Edit Home" },
-    { key: "store", label: "App Store" },
-    { key: "wall", label: "Wallpaper" },
-    { key: "controls", label: "Settings" }
-  ];
+  var utils = [{ key: "controls", label: "Settings" }];
 
   var CONTROLS = [
-    { key: "tv", label: "TV", sub: "Tuner", icon: "icons/tv.svg" },
-    { key: "hdmi1", label: "HDMI 1", icon: "icons/hdmi.svg" },
-    { key: "hdmi2", label: "HDMI 2", icon: "icons/hdmi.svg" },
-    { key: "hdmi3", label: "HDMI 3", icon: "icons/hdmi.svg" },
-    { key: "hdmi4", label: "HDMI 4", icon: "icons/hdmi.svg" },
-    { key: "ambient", label: "Ambient", icon: "icons/ambient.svg" },
-    { key: "wifi", label: "Wi-Fi", icon: "icons/wifi-on.svg" },
-    { key: "settings", label: "TV settings", icon: "icons/gear.svg" },
+    { section: "EXPERIENCE" },
+    { key: "edit", label: "Edit Home", icon: "icons/gear.svg" },
+    { key: "refresh", label: "Refresh Apps", icon: "icons/refresh.svg" },
     { key: "theme", label: "Theme", icon: "icons/theme.svg" },
     { key: "family-carousel", label: "Family carousel", icon: "icons/theme.svg" },
-    { key: "diag", label: "Diag", icon: "icons/diag.svg" },
+    { section: "CONTROLS" },
+    { key: "wifi", label: "Network", icon: "icons/wifi-on.svg" },
+    { key: "settings", label: "TV Settings", icon: "icons/gear.svg" },
+    { key: "diag", label: "Diagnostics", icon: "icons/diag.svg" },
     { key: "home", label: "Samsung Home", icon: "icons/home.svg" }
   ];
-  function hdmiConnected(port) {
-    for (var i = 0; state.videoSources && i < state.videoSources.length; i++) {
-      var source = state.videoSources[i] || {};
-      if (String(source.type || "").toUpperCase() === "HDMI" &&
-          String(source.number || source.name || "").replace(/\D/g, "") === String(port)) return true;
-    }
-    return false;
+  function visibleControls() {
+    return CONTROLS.filter(function (item) {
+      return !item.section && (item.key !== "family-carousel" || familyWallpaperIndexes().length);
+    });
   }
   function controlConnected(item) {
-    if (item.key === "wifi") return state.network === "WIFI" && state.wifiStatus !== "OFF";
-    if (item.key.indexOf("hdmi") === 0 && state.videoSources !== null) return hdmiConnected(item.key.slice(4));
-    return false;
+    return item.key === "wifi" && state.network === "WIFI" && state.wifiStatus !== "OFF";
   }
   function renderControls() {
     el.controlsList.innerHTML = "";
-    CONTROLS.forEach(function (item, i) {
+    var selectableIndex = 0;
+    CONTROLS.forEach(function (item) {
+      if (item.section) {
+        var heading = document.createElement("div");
+        heading.className = "ctrl-section";
+        heading.textContent = item.section;
+        el.controlsList.appendChild(heading);
+        return;
+      }
+      if (item.key === "family-carousel" && !familyWallpaperIndexes().length) return;
+      var i = selectableIndex++;
       var row = document.createElement("div");
-      row.className = "ctrl-item" + (i === state.controlsIndex ? " focus" : "") +
+      row.className = "ctrl-item" + (item.key === "home" ? " home-link" : "") +
+        (i === state.controlsIndex ? " focus" : "") +
         (controlConnected(item) ? " connected" : "");
       if (item.icon) {
         var ic = document.createElement("img");
@@ -573,11 +567,7 @@
       label.textContent = item.label;
       row.appendChild(label);
       var subText = item.sub || "";
-      if (item.key.indexOf("hdmi") === 0) {
-        var port = item.key.slice(4);
-        var connected = hdmiConnected(port);
-        subText = state.videoSources === null ? "Checking…" : (connected ? "✓ Connected" : "Not connected");
-      } else if (item.key === "wifi") {
+      if (item.key === "wifi") {
         subText = state.network === "WIFI" && state.wifiStatus !== "OFF" ? "✓ " + (state.wifiSsid || "Connected") :
           (state.network === "ETHERNET" ? "Ethernet" : "Not connected");
       }
@@ -607,18 +597,18 @@
     el.controls.hidden = true;
   }
   function controlsMove(d) {
-    state.controlsIndex = Math.max(0, Math.min(CONTROLS.length - 1, state.controlsIndex + d));
+    var count = visibleControls().length;
+    state.controlsIndex = Math.max(0, Math.min(count - 1, state.controlsIndex + d));
     renderControls();
   }
   function controlsActivate() {
-    var item = CONTROLS[state.controlsIndex];
+    var item = visibleControls()[state.controlsIndex];
     if (!item) return;
     if (item.key !== "family-carousel") closeControls();
-    if (item.key === "tv") { launch({ id: LIVETV_APP, name: "TV" }); return; }
-    if (item.key.indexOf("hdmi") === 0) { switchSource("HDMI" + item.key.slice(4)); return; }
-    if (item.key === "ambient") { launch({ id: "org.tizen.ambientapp", name: "Ambient" }); return; }
-    if (item.key === "wifi") { launch({ id: NETWORK_SETTINGS, name: "Wi-Fi" }); return; }
-    if (item.key === "settings") { launch({ id: SETTINGS_APP, name: "TV settings" }); return; }
+    if (item.key === "edit") { showGrid(true); return; }
+    if (item.key === "refresh") { refreshApps(); return; }
+    if (item.key === "wifi") { launch({ id: NETWORK_SETTINGS, name: "Network" }); return; }
+    if (item.key === "settings") { launch({ id: SETTINGS_APP, name: "TV Settings" }); return; }
     if (item.key === "theme") { cycleTheme(); return; }
     if (item.key === "family-carousel") {
       var indexes = familyWallpaperIndexes();
@@ -649,7 +639,7 @@
       var raw = localStorage.getItem(STORE_KEY);
       if (!raw) {
         return { dock: [], seeded: false, theme: "obsidian", showAll: false,
-                 dockOrder: false, allReset: false, liveTvInDock: false };
+                 dockOrder: false, allReset: false, liveTvInDock: false, sparseDockFixed: false };
       }
       var parsed = JSON.parse(raw);
       return {
@@ -659,11 +649,12 @@
         showAll: !!parsed.showAll,
         dockOrder: !!parsed.dockOrder,
         allReset: !!parsed.allReset,
-        liveTvInDock: !!parsed.liveTvInDock
+        liveTvInDock: !!parsed.liveTvInDock,
+        sparseDockFixed: !!parsed.sparseDockFixed
       };
     } catch (e) {
       return { dock: [], seeded: false, theme: "obsidian", showAll: false,
-               dockOrder: false, allReset: false, liveTvInDock: false };
+               dockOrder: false, allReset: false, liveTvInDock: false, sparseDockFixed: false };
     }
   }
 
@@ -690,11 +681,6 @@
   function labelFor(app) {
     if (app && app.id === LIVETV_APP) return "TV";
     return (app && app.name) || "";
-  }
-
-  function initial(name) {
-    var cleaned = String(name || "?").replace(/^samsung\s+/i, "").trim();
-    return cleaned.charAt(0).toUpperCase() || "?";
   }
 
   function brandFor(name) {
@@ -740,7 +726,7 @@
     var theme = themeFor(store.theme);
     state.columns = theme.columns;
     el.stage.className = "stage" + (theme.aurora ? " aurora" : "");
-    el.grid.style.gridTemplateColumns = "repeat(" + theme.columns + ", 190px)";
+    el.grid.style.gridTemplateColumns = "repeat(" + theme.columns + ", 160px)";
     saveStore();
   }
 
@@ -827,6 +813,7 @@
     apps.forEach(function (a) { byId[a.id] = a; });
     var picked = [];
     (ids || []).forEach(function (id) {
+      if (id === SETTINGS_APP || id === LIVETV_APP || id === SOURCE_APP) return;
       if (byId[id] && picked.indexOf(byId[id]) < 0 && !blockedOnHome(byId[id])) picked.push(byId[id]);
     });
     return picked.slice(0, MAX_DOCK);
@@ -839,22 +826,69 @@
     return null;
   }
 
-  function defaultDock(apps) {
+  function defaultDock(apps, limit) {
+    limit = limit || DEFAULT_DOCK_COUNT;
     var chosen = [];
     DEFAULT_IDS.forEach(function (id, index) {
       var hit = findById(apps, id) || findByExactName(apps, DEFAULT_NAMES[index]);
       if (hit && chosen.indexOf(hit) < 0) chosen.push(hit);
     });
 
-    // Fill any gap, then pin Settings as the last tile (the gear).
+    // Fill remaining Home slots with curated apps.
     apps.forEach(function (app) {
-      if (chosen.length < MAX_DOCK - 1 && chosen.indexOf(app) < 0 &&
+      if (chosen.length < limit && chosen.indexOf(app) < 0 &&
+          app.id !== SETTINGS_APP && app.id !== LIVETV_APP && app.id !== SOURCE_APP &&
           !blockedOnHome(app) && isCurated(app)) chosen.push(app);
     });
-    return chosen.slice(0, MAX_DOCK);
+    return chosen.slice(0, limit);
   }
 
   // ---------------------------------------------------------------- render
+  var iconSignatures = {};
+  function useNameArtwork(node, img, name) {
+    if (!img || img.parentNode !== node) return;
+    node.removeChild(img);
+    addNameArtwork(node, name);
+  }
+  function inspectNativeIcon(node, img, app) {
+    try {
+      var canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 12;
+      var context = canvas.getContext("2d");
+      context.drawImage(img, 0, 0, 12, 12);
+      var pixels = context.getImageData(0, 0, 12, 12).data;
+      var signature = "";
+      var colors = {};
+      for (var i = 0; i < pixels.length; i += 4) {
+        var color = (pixels[i] >> 4).toString(16) + (pixels[i + 1] >> 4).toString(16) +
+          (pixels[i + 2] >> 4).toString(16) + (pixels[i + 3] >> 4).toString(16);
+        colors[color] = true;
+        signature += color;
+      }
+      if (Object.keys(colors).length < 10) return;
+      var group = iconSignatures[signature] || (iconSignatures[signature] = { apps: {}, tiles: [] });
+      group.apps[app.id] = true;
+      group.tiles.push({ node: node, img: img, name: app.name });
+      if (Object.keys(group.apps).length < 2) return;
+      group.tiles.forEach(function (tile) { useNameArtwork(tile.node, tile.img, tile.name); });
+    } catch (e) {
+      // Some installed icon paths cannot be read through canvas; keep their image.
+    }
+  }
+  function addNameArtwork(node, name) {
+    name = String(name || "App").trim() || "App";
+    var hash = 0;
+    for (var i = 0; i < name.length; i++) hash = ((hash * 31) + name.charCodeAt(i)) >>> 0;
+    var hue = hash % 360;
+    node.classList.remove("image-art");
+    node.className += " generated";
+    node.style.background = "linear-gradient(145deg, hsl(" + hue + ", 52%, 34%), hsl(" + hue + ", 52%, 17%))";
+    var artwork = document.createElement("div");
+    artwork.className = "generated-mark";
+    artwork.textContent = name;
+    node.appendChild(artwork);
+  }
+
   function tile(app, index) {
     var node = document.createElement("div");
     node.className = "tile";
@@ -883,51 +917,37 @@
       more.textContent = "⋯";
       node.appendChild(more);
     } else if (brand && brand.card) {
+      node.className += " image-art";
       // A brand whose TV icon is a generic placeholder (YouTube on this firmware).
       var card = document.createElement("img");
       card.className = "brandcard";
       card.alt = "";
       card.src = brand.icon;
       node.appendChild(card);
-    } else if (app.iconPath) {
-      // The TV's own app card (Netflix wordmark, Prime blue card…)
-      var img = document.createElement("img");
-      img.className = "appicon";
-      img.alt = "";
-      img.onerror = function () {
-        if (img.parentNode === node) node.removeChild(img);
-        if (brand && brand.icon) {
-          var logo = document.createElement("img");
-          logo.className = "brand";
-          logo.alt = "";
-          logo.src = brand.icon;
-          node.appendChild(logo);
-        } else {
-          var mark = document.createElement("div");
-          mark.className = "mark";
-          mark.textContent = initial(app.name);
-          node.appendChild(mark);
-        }
-      };
-      img.src = app.iconPath;
-      node.appendChild(img);
     } else if (brand && brand.icon) {
+      node.className += " image-art";
       var logo = document.createElement("img");
       logo.className = "brand";
       logo.alt = "";
       logo.src = brand.icon;
       node.appendChild(logo);
-    } else if (brand && brand.letter) {
+    } else if (brand && brand.letter && !app.iconPath) {
       var colored = document.createElement("div");
       colored.className = "mark";
       colored.style.color = brand.color;
       colored.textContent = brand.letter;
       node.appendChild(colored);
+    } else if (app.iconPath) {
+      node.className += " image-art";
+      var img = document.createElement("img");
+      img.className = "appicon";
+      img.alt = "";
+      img.onload = function () { inspectNativeIcon(node, img, app); };
+      img.onerror = function () { useNameArtwork(node, img, app.name); };
+      img.src = app.iconPath;
+      node.appendChild(img);
     } else {
-      var mark = document.createElement("div");
-      mark.className = "mark";
-      mark.textContent = initial(app.name);
-      node.appendChild(mark);
+      addNameArtwork(node, app.name);
     }
 
     var label = document.createElement("div");
@@ -942,6 +962,13 @@
   }
 
   function renderUtils() {
+    var selectedKey = utils[state.utilIndex] && utils[state.utilIndex].key;
+    utils = [];
+    if (WALLPAPERS.length > 1) utils.push({ key: "wall", label: "Wallpaper" });
+    utils.push({ key: "controls", label: "Settings" });
+    for (var selectedIndex = 0; selectedIndex < utils.length; selectedIndex++) {
+      if (utils[selectedIndex].key === selectedKey) { state.utilIndex = selectedIndex; break; }
+    }
     el.utils.innerHTML = "";
     utils.forEach(function (util, index) {
       var node = document.createElement("div");
@@ -984,7 +1011,6 @@
       { key: "hdmi3", label: "HDMI 3", sub: hdmiStatus(3), up: hdmiStatus(3) === "Connected" },
       { key: "hdmi4", label: "HDMI 4", sub: hdmiStatus(4), up: hdmiStatus(4) === "Connected" },
       { key: "livetv", label: "TV", sub: "Tuner" },
-      { key: "ambient", label: "Ambient", sub: "Art" }
     ];
   }
 
@@ -1044,21 +1070,83 @@
       window.tizen.systeminfo.getPropertyValue("VIDEOSOURCE", function (info) {
         state.videoSources = (info && info.connected) || [];
         renderRail();
+        renderSources();
         if (state.zone === "rail") paintFocus();
         if (state.controlsOpen) renderControls();
-      }, function () { state.videoSources = null; renderRail(); });
-    } catch (e) { state.videoSources = null; }
+      }, function () { state.videoSources = null; renderRail(); renderSources(); });
+    } catch (e) { state.videoSources = null; renderSources(); }
+  }
+
+  function sourceItems() {
+    var items = [];
+    var ports = [];
+    for (var i = 0; state.videoSources && i < state.videoSources.length; i++) {
+      var source = state.videoSources[i] || {};
+      if (String(source.type).toUpperCase() !== "HDMI") continue;
+      var port = Number(source.number);
+      if (port > 0 && ports.indexOf(port) < 0) ports.push(port);
+    }
+    ports.sort(function (a, b) { return a - b; });
+    for (var j = 0; j < ports.length; j++) {
+      items.push({ key: "HDMI" + ports[j], label: "HDMI " + ports[j], icon: "icons/hdmi.svg" });
+    }
+    items.push({ key: "TV", label: "Live TV", icon: "icons/tv.svg" });
+    return items;
+  }
+
+  function renderSources() {
+    if (!el.sources) return;
+    var items = sourceItems();
+    state.sourceIndex = Math.min(state.sourceIndex, items.length - 1);
+    el.sources.innerHTML = "";
+    items.forEach(function (item, index) {
+      var tile = document.createElement("div");
+      tile.className = "tile";
+      tile.setAttribute("data-index", index);
+      var icon = document.createElement("img");
+      icon.src = item.icon;
+      icon.alt = "";
+      tile.appendChild(icon);
+      var label = document.createElement("div");
+      label.className = "name";
+      label.textContent = item.label;
+      tile.appendChild(label);
+      el.sources.appendChild(tile);
+    });
+    el.sourcesPlate = document.createElement("div");
+    el.sourcesPlate.className = "plate";
+    el.sources.appendChild(el.sourcesPlate);
+    updateHomeSpacing();
+    if (state.zone === "sources") paintFocus();
+  }
+
+  function updateHomeSpacing() {
+    if (state.dock.length + 1 + sourceItems().length > 10) el.homeRow.classList.add("dense");
+    else el.homeRow.classList.remove("dense");
   }
 
   function renderDock() {
     el.dock.innerHTML = "";
-    el.dock.hidden = !state.dock.length;
+    el.dock.hidden = false;
     state.dock.forEach(function (app, index) {
       el.dock.appendChild(tile(app, index));
     });
+    var all = document.createElement("div");
+    all.className = "tile all-apps-tile";
+    all.setAttribute("data-index", state.dock.length);
+    var icon = document.createElement("div");
+    icon.className = "all-apps-icon";
+    for (var i = 0; i < 4; i++) icon.appendChild(document.createElement("span"));
+    all.appendChild(icon);
+    var label = document.createElement("div");
+    label.className = "name";
+    label.textContent = "All Apps";
+    all.appendChild(label);
+    el.dock.appendChild(all);
     el.dockPlate = document.createElement("div");
     el.dockPlate.className = "plate";
     el.dock.appendChild(el.dockPlate);
+    updateHomeSpacing();
   }
 
   function renderGrid() {
@@ -1083,6 +1171,18 @@
     // Follow the focused tile's 8px lift exactly. The plate is the same size as
     // the tile, so a card that fills the tile hides it completely.
     plate.style.transform = "translate(" + tile.offsetLeft + "px," + (tile.offsetTop - 8) + "px)";
+    plate.style.opacity = "1";
+  }
+
+  function moveHomePlate(tile) {
+    var plate = el.homePlate;
+    if (!plate || plate._tile === tile) return;
+    plate._tile = tile;
+    if (!tile) { plate.style.opacity = "0"; return; }
+    var row = el.homeRow.getBoundingClientRect();
+    var dock = tile.parentNode.getBoundingClientRect();
+    plate.style.transform = "translate(" + (dock.left - row.left + tile.offsetLeft) + "px," +
+      (dock.top - row.top + tile.offsetTop - 8) + "px)";
     plate.style.opacity = "1";
   }
 
@@ -1146,6 +1246,8 @@
   function paintFocus() {
     setGlow(null);
     if (el.npCard) el.npCard.classList.remove("focus");
+    if (state.view !== "home" || (state.zone !== "dock" && state.zone !== "sources")) moveHomePlate(null);
+    if (state.zone !== "sources") movePlate(el.sourcesPlate, null);
 
     if (state.view === "grid") {
       var gridNodes = el.grid.querySelectorAll(".tile");
@@ -1155,10 +1257,10 @@
       setChips(el.utils, -1);
       setChips(el.rail, -1);
       var app = state.grid[state.gridIndex];
-      setStack(el.eyebrowStack, state.editing ? "edit" : "apps");
+      setStack(el.eyebrowStack, state.editing ? "edit" : "all");
       showTitle("grid", state.grid.map(function (a) { return labelFor(a); }),
         state.gridIndex);
-      setStack(el.subStack, state.editing ? "edit" : "apps");
+      setStack(el.subStack, state.editing ? "edit" : "all");
       scrollGrid();
       return;
     }
@@ -1171,9 +1273,9 @@
       setChips(el.rail, -1);
       setChips(el.rail, state.railIndex);
       var item = railItems()[state.railIndex];
-      setStack(el.eyebrowStack, "quick");
+      setStack(el.eyebrowStack, "sources");
       showTitle("rail", railItems().map(function (r) { return r.label; }), state.railIndex);
-      setStack(el.subStack, "quick");
+      setStack(el.subStack, "sources");
       return;
     }
 
@@ -1203,25 +1305,45 @@
       return;
     }
 
+    if (state.zone === "sources") {
+      var sourceNodes = el.sources.querySelectorAll(".tile");
+      var sources = sourceItems();
+      setFocusedTile(sourceNodes[state.sourceIndex]);
+      moveHomePlate(sourceNodes[state.sourceIndex]);
+      movePlate(el.dockPlate, null);
+      setChips(el.utils, -1);
+      setStack(el.eyebrowStack, "sources");
+      showTitle("sources:" + sources.map(function (s) { return s.key; }).join(","),
+        sources.map(function (s) { return s.label; }), state.sourceIndex);
+      setStack(el.subStack, "sources");
+      return;
+    }
+
     var dockNodes = el.dock.querySelectorAll(".tile");
     setFocusedTile(dockNodes[state.dockIndex]);
-    movePlate(el.dockPlate, dockNodes[state.dockIndex]);
+    moveHomePlate(dockNodes[state.dockIndex]);
     movePlate(el.gridPlate, null);
     setChips(el.utils, -1);
     setChips(el.rail, -1);
     var current = state.dock[state.dockIndex];
     setGlow(current);
-    setStack(el.eyebrowStack, state.reordering ? "reorder" : "apps");
-    showTitle("dock", state.dock.length
-      ? state.dock.map(function (a) { return labelFor(a); })
-      : ["No apps on Home"], state.dock.length ? state.dockIndex : 0);
-    setStack(el.subStack, state.reordering ? "reorder" : "apps");
+    setStack(el.eyebrowStack, state.reordering ? "reorder" : "home");
+    showTitle("dock", state.dock.map(function (a) { return labelFor(a); }).concat(["All Apps"]), state.dockIndex);
+    setStack(el.subStack, state.reordering ? "reorder" : "home");
   }
 
   function scrollGrid() {
     var row = Math.floor(state.gridIndex / state.columns);
-    var offset = Math.max(0, (row - 2) * ROW_H);
+    var offset = row * ROW_H;
+    if (gridFadeTimer) { clearTimeout(gridFadeTimer); gridFadeTimer = null; }
     el.grid.style.transform = offset ? "translateY(-" + offset + "px)" : "";
+    if (offset) el.gridViewport.classList.add("scrolled");
+    else if (el.gridViewport.classList.contains("scrolled")) {
+      gridFadeTimer = setTimeout(function () {
+        gridFadeTimer = null;
+        if (state.view === "grid" && state.gridIndex < state.columns) el.gridViewport.classList.remove("scrolled");
+      }, 220);
+    }
   }
 
   // ---------------------------------------------------------------- actions
@@ -1242,21 +1364,6 @@
     } catch (e) {
       toast("Could not open " + app.name);
     }
-  }
-
-  function launchStore() {
-    var ids = ["com.samsung.tv.store", "com.samsung.tv.coba.apps", "org.volt.apps"];
-    if (!hasTizen()) { toast("Preview: would open the App Store"); return; }
-    function attempt(i) {
-      if (i >= ids.length) { toast("Could not open the App Store"); return; }
-      try {
-        window.tizen.application.launch(ids[i], function () { /* opened */ },
-          function () { attempt(i + 1); });
-      } catch (e) {
-        attempt(i + 1);
-      }
-    }
-    attempt(0);
   }
 
   function toggleHome(app) {
@@ -1547,23 +1654,68 @@
 
   function switchSource(name) {
     if (!hasTizen()) { toast("Preview: switch to " + name); return; }
+    if (!window.tizen.tvwindow || !window.tizen.systeminfo) {
+      toast("Input switching is unavailable on this TV");
+      return;
+    }
+    var kind = name.indexOf("HDMI") === 0 ? "HDMI" : "TV";
+    var port = kind === "HDMI" ? Number(name.slice(4)) : 0;
     try {
-      var data = [
-        new window.tizen.ApplicationControlData("source", [name]),
-        new window.tizen.ApplicationControlData("input", [name])
-      ];
-      var control = new window.tizen.ApplicationControl(
-        "http://tizen.org/appcontrol/operation/default", null, null, null, data);
-      window.tizen.application.launchAppControl(control, SOURCE_APP,
-        function () { toast("Switching to " + name); },
-        function () { launch({ id: SOURCE_APP, name: "Sources" }); });
+      window.tizen.systeminfo.getPropertyValue("VIDEOSOURCE", function (info) {
+        var sources = (info && info.connected) || [];
+        var source = null;
+        for (var i = 0; i < sources.length; i++) {
+          if (String(sources[i].type).toUpperCase() === kind &&
+              (kind === "TV" || Number(sources[i].number) === port)) {
+            source = sources[i];
+            break;
+          }
+        }
+        if (!source) { toast(name + " is not connected"); return; }
+        try {
+          window.tizen.tvwindow.setSource(source, function () {
+            try {
+              window.tizen.tvwindow.show(function () {
+                state.videoWindowOpen = true;
+              }, function (error) {
+                toast("Could not show " + name + ": " + (error && error.message || "refused"));
+              });
+            } catch (error) {
+              toast("Could not show " + name + ": " + (error.message || "refused"));
+            }
+          }, function (error) {
+            toast("Could not switch to " + name + ": " + (error && error.message || "refused"));
+          });
+        } catch (error) {
+          toast("Could not switch to " + name + ": " + (error.message || "refused"));
+        }
+      }, function (error) {
+        toast("Could not read inputs: " + (error.message || "refused"));
+      });
     } catch (e) {
-      launch({ id: SOURCE_APP, name: "Sources" });
+      toast("Could not switch to " + name + ": " + (e.message || "refused"));
+    }
+  }
+
+  function closeVideoWindow() {
+    try {
+      window.tizen.tvwindow.hide(function () {
+        state.videoWindowOpen = false;
+      }, function (error) {
+        toast("Could not close input: " + (error.message || "refused"));
+      });
+    } catch (e) {
+      toast("Could not close input: " + (e.message || "refused"));
     }
   }
 
   function activate() {
     if (state.zone === "card") { openMusic(); return; }
+    if (state.zone === "sources") {
+      var source = sourceItems()[state.sourceIndex];
+      if (source) switchSource(source.key);
+      return;
+    }
     if (state.view === "grid") {
       var app = state.grid[state.gridIndex];
       if (!state.grid.length) { paintFocus(); return; }
@@ -1574,8 +1726,7 @@
     if (state.zone === "rail") {
       var rail = railItems()[state.railIndex];
       if (rail.key === "wifi") { launch({ id: NETWORK_SETTINGS, name: "Wi-Fi" }); return; }
-      if (rail.key === "ambient") { launch({ id: "org.tizen.ambientapp", name: "Ambient" }); return; }
-      if (rail.key === "livetv") { launch({ id: LIVETV_APP, name: "TV" }); return; }
+      if (rail.key === "livetv") { switchSource("TV"); return; }
       if (rail.key === "music") { openMusic(); return; }
       if (rail.key.indexOf("hdmi") === 0) {
         switchSource("HDMI" + rail.key.slice(4));
@@ -1587,15 +1738,12 @@
 
     if (state.zone === "utils") {
       var util = utils[state.utilIndex];
-      if (util.key === "all") { showGrid(false); return; }
-      if (util.key === "refresh") { refreshApps(); return; }
-      if (util.key === "edit") { showGrid(true); return; }
-      if (util.key === "store") { launchStore(); return; }
       if (util.key === "music") { openMusic(); return; }
       if (util.key === "wall") { openWallPicker(); return; }
       if (util.key === "controls") { openControls(); return; }
       return;
     }
+    if (state.dockIndex === state.dock.length) { showGrid(false); return; }
     launch(state.dock[state.dockIndex]);
   }
 
@@ -1605,10 +1753,12 @@
     state.editing = !!editing;
     state.grid = visibleApps();
     state.gridIndex = 0;
-    el.dock.hidden = true;
+    el.homeRow.hidden = true;
     el.rail.hidden = true;
-    el.grid.hidden = false;
+    el.gridViewport.hidden = false;
     el.grid.style.transform = "";
+    if (gridFadeTimer) { clearTimeout(gridFadeTimer); gridFadeTimer = null; }
+    el.gridViewport.classList.remove("scrolled");
     renderGrid();
     paintFocus();
   }
@@ -1617,16 +1767,28 @@
     state.view = "home";
     state.editing = false;
     state.zone = "dock";
-    el.grid.hidden = true;
-    el.dock.hidden = !state.dock.length;
+    state.returnZone = "dock";
+    el.gridViewport.hidden = true;
+    if (gridFadeTimer) { clearTimeout(gridFadeTimer); gridFadeTimer = null; }
+    el.gridViewport.classList.remove("scrolled");
+    el.homeRow.hidden = false;
+    el.dock.hidden = false;
     el.rail.hidden = true;
     el.grid.style.transform = "";
     paintFocus();
   }
 
+  function showSources() {
+    state.zone = "sources";
+    state.returnZone = "sources";
+    state.sourceIndex = 0;
+    paintFocus();
+  }
+
   function back() {
+    if (state.zone === "sources") { state.zone = "dock"; state.returnZone = "dock"; paintFocus(); return; }
     if (state.view === "grid") { showHome(); return; }
-    if (state.zone === "utils") { state.zone = "dock"; paintFocus(); return; }
+    if (state.zone === "utils") { state.zone = state.returnZone === "sources" ? "sources" : "dock"; paintFocus(); return; }
     toast("Press the TV's Home button for Smart Hub");
   }
 
@@ -1657,7 +1819,6 @@
       var i = state.gridIndex;
       if (key === 37) i = Math.max(0, i - 1);
       if (key === 39) i = Math.min(state.grid.length - 1, i + 1);
-      if (key === 38 && i < state.columns) { showHome(); return; }
       if (key === 38) i = Math.max(0, i - state.columns);
       if (key === 40) i = Math.min(state.grid.length - 1, i + state.columns);
       state.gridIndex = i;
@@ -1665,8 +1826,23 @@
       return;
     }
 
+    if (state.zone === "sources") {
+      if (key === 37 && state.sourceIndex === 0) {
+        state.zone = "dock";
+        state.returnZone = "dock";
+        state.dockIndex = state.dock.length;
+        paintFocus();
+        return;
+      }
+      if (key === 37) state.sourceIndex--;
+      if (key === 39) state.sourceIndex = Math.min(sourceItems().length - 1, state.sourceIndex + 1);
+      if (key === 38) { state.returnZone = "sources"; state.zone = "utils"; state.utilIndex = 0; }
+      paintFocus();
+      return;
+    }
+
     if (state.zone === "card") {
-      if (key === 38) { state.zone = "utils"; state.utilIndex = 0; }
+      if (key === 38) { state.returnZone = "dock"; state.zone = "utils"; state.utilIndex = 0; }
       if (key === 40) state.zone = "dock";
       paintFocus();
       return;
@@ -1676,7 +1852,8 @@
       if (key === 37) state.utilIndex = Math.max(0, state.utilIndex - 1);
       if (key === 39) state.utilIndex = Math.min(utils.length - 1, state.utilIndex + 1);
       if (key === 40) {
-        if (np && np.title) state.zone = "card";
+        if (state.returnZone === "sources") state.zone = "sources";
+        else if (np && np.title) state.zone = "card";
         else state.zone = "dock";
       }
       if (key === 38) state.zone = "utils";
@@ -1693,8 +1870,10 @@
     }
 
     if (key === 37) state.dockIndex = Math.max(0, state.dockIndex - 1);
-    if (key === 39) state.dockIndex = Math.min(Math.max(0, state.dock.length - 1), state.dockIndex + 1);
+    if (key === 39 && state.dockIndex === state.dock.length) { showSources(); return; }
+    if (key === 39) state.dockIndex = Math.min(state.dock.length, state.dockIndex + 1);
     if (key === 38) {
+      state.returnZone = "dock";
       if (np && np.title) state.zone = "card";
       else { state.zone = "utils"; state.utilIndex = 0; }
     }
@@ -1730,6 +1909,14 @@
 
   function onKeyDown(event) {
     var key = event.keyCode;
+
+    if (state.videoWindowOpen) {
+      if (key === 10009 || key === 27) {
+        closeVideoWindow();
+        event.preventDefault();
+      }
+      return;
+    }
 
     if (state.wallOpen) {
       if (key === 37) { wallMove(-1); event.preventDefault(); return; }
@@ -1782,13 +1969,13 @@
         return;
       }
       if (event.repeat) {
-        if (state.view === "home" && state.zone === "dock") enterReorder();
+        if (state.view === "home" && state.zone === "dock" && state.dockIndex < state.dock.length) enterReorder();
         return;
       }
       state.holdFired = false;
       clearTimeout(state.holdTimer);
       state.holdTimer = setTimeout(function () {
-        if (state.view === "home" && state.zone === "dock") {
+        if (state.view === "home" && state.zone === "dock" && state.dockIndex < state.dock.length) {
           state.holdFired = true;
           enterReorder();
         }
@@ -1807,6 +1994,7 @@
 
   function onKeyUp(event) {
     if (event.keyCode !== 13) return;
+    if (state.videoWindowOpen) return;
     if (state.musicOpen) { musicActivate(); event.preventDefault(); return; }
     clearTimeout(state.holdTimer);
     if (state.suppressActivate) {
@@ -2247,19 +2435,21 @@
     state.apps = apps;
     state.grid = visibleApps();
 
+    // An older build silently appended a default app to a four-app saved dock.
+    if (!store.sparseDockFixed) {
+      if (store.dock.length === MAX_DOCK) {
+        var priorDefaults = defaultDock(apps, MAX_DOCK);
+        var filler = priorDefaults.filter(function (app) {
+          return store.dock.slice(0, MAX_DOCK - 1).indexOf(app.id) < 0;
+        })[0];
+        if (filler && filler.id === store.dock[MAX_DOCK - 1]) store.dock.pop();
+      }
+      store.sparseDockFixed = true;
+      saveStore();
+    }
+
     if (store.seeded && store.dockOrder) {
       state.dock = resolveDock(apps, store.dock);
-      if (!store.liveTvInDock) {
-        var live = findById(apps, "com.samsung.tv.coba.livetv");
-        var gear = findById(apps, SETTINGS_APP);
-        if (live && state.dock.indexOf(live) < 0 && state.dock.length < MAX_DOCK) {
-          var at = state.dock.indexOf(gear);
-          if (at >= 0) state.dock.splice(at, 0, live); else state.dock.push(live);
-          store.dock = state.dock.map(function (a) { return a.id; });
-        }
-        store.liveTvInDock = true;
-        saveStore();
-      }
     } else {
       state.dock = defaultDock(apps);
       store.dock = state.dock.map(function (a) { return a.id; });
@@ -2268,12 +2458,13 @@
       saveStore();
     }
 
-    state.dock = state.dock.filter(function (a) { return a.id !== SETTINGS_APP; });
     store.dock = state.dock.map(function (a) { return a.id; });
+    state.dockIndex = Math.min(state.dockIndex, state.dock.length);
 
     el.empty.hidden = apps.length > 0;
     if (!apps.length) el.emptyText.textContent = "The TV returned an empty app list.";
 
+    iconSignatures = {};
     renderUtils();
     renderDock();
     renderGrid();
@@ -2341,6 +2532,7 @@
     }
     if (DIAGNOSTICS) reportCaps();
     renderRail();
+    renderSources();
     if (DIAGNOSTICS) probeSystem();
     var bench = /[?&]bench=([a-z]+)/.exec(location.search);
     if (bench) {

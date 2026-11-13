@@ -5,12 +5,13 @@
     <access origin="*" subdomains="true"/>
     <content src="index.html"/>
     <icon src="icon.png"/>
-    <name>Clean Home</name>
+    <name>Clean Hub</name>
     <description>A quiet launcher for Tizen TVs.</description>
     <tizen:profile name="tv"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <tizen:privilege name="http://tizen.org/privilege/application.info"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>

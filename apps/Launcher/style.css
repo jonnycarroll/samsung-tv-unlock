@@ -236,26 +236,56 @@ html, body {
 .dock .tile { width: 160px; height: 160px; margin-right: 14px; }
 .dock .plate { width: 160px; height: 160px; }
 
+.home-row { position: absolute; left: 32px; right: 32px; bottom: 200px; display: flex; align-items: flex-end; justify-content: center; }
+.home-row[hidden] { display: none; }
+.home-row > .plate { width: 160px; height: 160px; z-index: 1; }
+.home-row .dock > .plate { display: none; }
+.home-panel { position: relative; flex: 0 0 auto; }
+.apps-panel { margin-right: 24px; }
+.home-row .dock { position: relative; left: auto; bottom: auto; transform: none; width: auto; padding: 12px; }
+.home-row .dock .tile { margin-right: 20px; }
+.home-row.dense .dock .tile { margin-right: 4px; }
+.all-apps-tile { background: rgba(0,0,0,0.48); }
+.all-apps-icon { display: grid; grid-template-columns: repeat(2, 25px); grid-template-rows: repeat(2, 25px); gap: 9px; transform: translateY(-10px); }
+.all-apps-icon span { display: block; border-radius: 6px; background: rgba(243,245,248,0.86); }
+.home-row #dock .all-apps-tile .name { display: block; opacity: 1; font-size: 20px; }
+.home-row #sources .tile { background: rgba(0,0,0,0.65); }
+.home-row #sources .tile .name { display: block; opacity: 1; font-size: 21px; }
+.home-row #sources .tile img { width: 72px; height: 72px; transform: translateY(-14px); }
+.home-row #sources .tile:nth-last-child(2), .home-row #dock .tile:nth-last-child(2) { margin-right: 0; }
+
 /* ---- grid ---- */
+.grid-viewport {
+  position: absolute; left: 96px; top: 300px;
+  width: 1728px; height: 710px; overflow: hidden;
+}
+.grid-viewport.scrolled {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,0.08) 125px, rgba(0,0,0,0.45) 155px, #000 175px);
+  mask-image: linear-gradient(to bottom, transparent 0, rgba(0,0,0,0.08) 125px, rgba(0,0,0,0.45) 155px, #000 175px);
+}
+.grid-viewport[hidden] { display: none; }
 .grid {
-  position: absolute;
-  left: 96px; top: 240px;
+  position: relative;
   will-change: transform;
-  width: 1728px; height: 720px;
+  width: 1728px;
+  padding-top: 175px;
+  transition: transform 180ms cubic-bezier(.2,.7,.2,1);
   display: grid;
-  grid-template-columns: repeat(5, 190px);
-  grid-column-gap: 18px;
+  grid-template-columns: repeat(6, 160px);
+  grid-column-gap: 27px;
   grid-row-gap: 18px;
   align-content: start;
 }
-.grid[hidden] { display: none; }
-.grid .tile { margin-right: 0; background: #1c1c1e; }
+.grid .tile { width: 160px; height: 160px; margin-right: 0; background: #1c1c1e; }
+.grid .plate { width: 160px; height: 160px; }
 .grid .tile .name {
   opacity: 1; transform: none;
   font-size: 22px; bottom: 10px;
   color: rgba(243,245,248,0.72);
 }
 .grid .tile.focus .name { color: #f3f5f8; }
+.grid .tile.image-art .name { display: none; }
+.grid .tile.image-art img { transform: none; opacity: 1; }
 
 /* ---- states ---- */
 .empty {
@@ -484,7 +514,8 @@ html, body {
 #wallpaper.on { opacity: 1; }
 #wallpaper-dim { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 2; opacity: 0; transition: opacity 500ms linear; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.05) 42%, rgba(0,0,0,0.62) 100%); }
 #wallpaper-dim.on { opacity: 1; }
-#stage > .glow, #stage > .clock, #stage > .utils, #stage > .shelf, #stage > .dock, #stage > .rail, #stage > .grid, #stage > .np-card, #stage > .music, #stage > .empty, #stage > .toast { z-index: 3; }
+#stage > .glow, #stage > .clock, #stage > .utils, #stage > .home-row, #stage > .rail, #stage > .grid-viewport, #stage > .np-card, #stage > .music, #stage > .empty, #stage > .toast { z-index: 3; }
+#stage > .shelf { z-index: 4; }
 
 /* ---- wallpaper bottom sheet ---- */
 .wallpicker {
@@ -520,19 +551,21 @@ html, body {
 .tile.prime.focus { background: #ffffff; }
 
 /* ---- app-store style icons + weather ---- */
-.tile img.appicon { width: 100%; height: 100%; object-fit: contain; border-radius: 16px; }
+.tile img.appicon { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
 .weather { display: flex; align-items: center; margin-top: 14px; font-size: 27px; line-height: 34px; color: rgba(243,245,248,0.82); }
 /* Tizen's Chromium ignores flex gap: use margins. */
 .wx-icon { font-size: 31px; line-height: 34px; flex: none; margin-right: 10px; }
 .wx-temp { font-weight: 500; letter-spacing: -0.4px; }
 .wx-hilo { color: rgba(243,245,248,0.46); font-size: 20px; letter-spacing: 0.2px; margin-left: 12px; }
 
-.tile img.brandcard { width: 100%; height: 100%; object-fit: contain; border-radius: 16px; }
+.tile img.brandcard { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
 
 /* ---- dock polish: dark plates for TV/Settings, no labels ---- */
 .dock .tile .name { display: none; }
 .tile.dark { background: #000; }
 .tile.dark.focus { background: #000; }
+.tile.generated .generated-mark { width: 140px; max-height: 3.4em; overflow: hidden; color: #fff; font-size: 23px; line-height: 1.13; font-weight: 600; text-align: center; overflow-wrap: break-word; }
+.grid .tile.generated .name, .dock .tile.generated .name { display: none; }
 
 /* ---- controls popover ---- */
 .controls {
@@ -545,7 +578,8 @@ html, body {
   z-index: 5;
 }
 .controls[hidden] { display: none; }
-.controls-head { font-size: 15px; letter-spacing: 0.22em; color: rgba(243,245,248,0.42); margin: 6px 12px 12px; }
+.ctrl-section { margin: 18px 14px 6px; font-size: 17px; letter-spacing: 0.16em; color: rgba(243,245,248,0.52); }
+.ctrl-item.home-link { border-top: 1px solid rgba(255,255,255,0.15); margin-top: 12px; padding-top: 18px; }
 .ctrl-item { display: flex; align-items: center; padding: 12px 14px; border-radius: 14px; font-size: 24px; color: rgba(243,245,248,0.82); }
 .ctrl-item .sub { margin-left: auto; font-size: 18px; color: rgba(243,245,248,0.5); }
 .ctrl-item.connected { color: #73e6a0; }

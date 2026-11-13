@@ -74,7 +74,7 @@
         '<div class="chips">' +
           chip(checks.tizen, "Tizen CLI") +
           chip(checks.sdb, "sdb") +
-          '<span class="chip">Python ' + esc(checks.python || "?") + "</span>" +
+          chip(Boolean(checks.python), "Python " + (checks.python || "?")) +
         "</div>" +
         '<p class="hint">The installer uses the Tizen CLI to build and install. If the Tizen chip is red, ' +
         "install Tizen Studio (and on macOS 27, Rosetta 2) first — the repo README has the one line.</p>" +
@@ -150,17 +150,16 @@
 
   function stepInstall() {
     var profiles = (state.checks && state.checks.profiles) || [];
-    var selected = state.settings.profile || profiles[0] || "peregrine-samsung";
+    var selected = state.settings.profile || profiles[0] || "";
     var options = profiles.map(function (p) {
       return '<option value="' + esc(p) + '"' + (p === selected ? " selected" : "") + ">" + esc(p) + "</option>";
     }).join("");
-    if (!profiles.length) options = '<option value="peregrine-samsung">peregrine-samsung</option>';
+    if (!profiles.length) options = '<option value="">No certificate profiles found</option>';
     return (
       '<div class="card">' +
         '<div class="label">Certificate profile</div>' +
         '<select id="profile" class="field">' + options + "</select>" +
-        '<p class="hint">Tizen signs the package with an author certificate. These are the profiles already on this computer. ' +
-        "Create one with <code>tizen certificate</code> if the list is empty.</p>" +
+        '<p class="hint">Create a Samsung TV profile in Tizen Studio Certificate Manager with an author certificate and a Public distributor certificate containing this TV\'s DUID. Then reload this page. <code>tizen certificate</code> alone cannot create the required Samsung TV profile.</p>' +
       "</div>" +
       '<div class="card" style="margin-top:12px">' +
         '<div class="label">Family photos (optional)</div>' +
@@ -168,8 +167,8 @@
         '<p class="hint">Put photos in this folder. They stay on this computer and are packaged only into this TV install; they are never added to Git.</p>' +
       "</div>" +
       '<div class="card" style="margin-top:12px">' +
-        '<div class="row"><button type="button" class="primary" id="install-btn"' + (state.settings.tvIp ? "" : " disabled") + ">Install Clean Home</button>" +
-        '<span class="hint" style="margin:0">' + (state.settings.tvIp ? "TV: " + esc(state.settings.tvIp) : "Connect to a TV first (previous step).") + "</span></div>" +
+        '<div class="row"><button type="button" class="primary" id="install-btn"' + (state.settings.tvIp && profiles.length ? "" : " disabled") + ">Install Clean Home</button>" +
+        '<span class="hint" style="margin:0">' + (!profiles.length ? "Create a Samsung TV certificate profile first." : state.settings.tvIp ? "TV: " + esc(state.settings.tvIp) : "Connect to a TV first (previous step).") + "</span></div>" +
         '<div id="install-status"></div>' +
         '<div class="log" id="install-log" hidden></div>' +
       "</div>"
@@ -297,7 +296,8 @@
   }
 
   function install() {
-    var profile = ($("profile") && $("profile").value) || "peregrine-samsung";
+    var profile = ($("profile") && $("profile").value) || "";
+    if (!profile) return;
     var familyDir = (($('family-dir') && $('family-dir').value) || "").trim();
     saveSettings({ profile: profile, tvIp: state.settings.tvIp || "", familyDir: familyDir });
     $("install-btn").disabled = true;

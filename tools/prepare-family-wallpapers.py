@@ -26,14 +26,22 @@ def main() -> int:
     args = parser.parse_args()
 
     source_dir = args.source.expanduser()
+    catalog_path = args.launcher / "wallpapers.json"
+    catalog = json.loads(catalog_path.read_text()) if catalog_path.exists() else []
+    def save_available() -> None:
+        available = [item for item in catalog if isinstance(item, dict) and item.get("file")
+                     and (args.launcher / item["file"]).is_file()]
+        catalog_path.write_text(json.dumps(available, indent=1) + "\n")
+
     if not source_dir.is_dir():
-        print(f"family photos: {source_dir} (directory not found; skipped)")
+        save_available()
         return 0
 
     try:
         subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except (OSError, subprocess.CalledProcessError):
         print("family photos: ffmpeg is not installed; skipped")
+        save_available()
         return 0
 
     wallpapers = args.launcher / "wallpapers"
@@ -41,8 +49,6 @@ def main() -> int:
     thumbs_dir = wallpapers / "thumbs"
     family_dir.mkdir(parents=True, exist_ok=True)
     thumbs_dir.mkdir(parents=True, exist_ok=True)
-    catalog_path = args.launcher / "wallpapers.json"
-    catalog = json.loads(catalog_path.read_text())
     existing = {item.get("id") for item in catalog if isinstance(item, dict)}
     imported = 0
 
@@ -83,8 +89,7 @@ def main() -> int:
         existing.add(wallpaper_id)
         imported += 1
 
-    if imported:
-        catalog_path.write_text(json.dumps(catalog, indent=1) + "\n")
+    save_available()
     print(f"family photos: imported {imported} from {source_dir}")
     return 0
 

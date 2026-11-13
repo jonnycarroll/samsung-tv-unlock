@@ -263,10 +263,12 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/install":
             ip = body.get("ip") or ""
-            profile = body.get("profile") or "peregrine-samsung"
+            profile = body.get("profile") or ""
             family_dir = body.get("familyDir") or os.path.expanduser("~/Pictures/Clean Home/Family")
             if not ip:
                 return self._json({"error": "no ip"}, 400)
+            if profile not in certificates():
+                return self._json({"error": "Select a Samsung TV certificate profile in Certificate Manager, then reload the wizard."}, 400)
             script = (
                 'set -e; export PATH="$HOME/tizen-studio/tools:$HOME/tizen-studio/tools/ide/bin:$PATH"; '
                 'sdb connect %s:26101 >/dev/null 2>&1 || true; PROFILE=%s tools/deploy-launcher.sh'
@@ -288,17 +290,20 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    url = "http://127.0.0.1:%d/?t=%s" % (PORT, TOKEN)
-    print("Clean Home installer: %s" % url, flush=True)
-    print("Local only. Ctrl+C stops it.", flush=True)
-    try:
-        import webbrowser
-
-        webbrowser.open(url)
-    except Exception:  # noqa: BLE001
-        pass
     with ThreadingHTTPServer(("127.0.0.1", PORT), Handler) as httpd:
-        httpd.serve_forever()
+        url = "http://127.0.0.1:%d/?t=%s" % (httpd.server_port, TOKEN)
+        print("Clean Home installer: %s" % url, flush=True)
+        print("Local only. Ctrl+C stops it.", flush=True)
+        try:
+            import webbrowser
+
+            webbrowser.open(url)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nInstaller stopped.", flush=True)
 
 
 if __name__ == "__main__":
