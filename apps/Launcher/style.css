@@ -251,8 +251,10 @@ html, body {
 .dock .tile { width: 160px; height: 160px; margin-right: 14px; }
 .dock .plate { width: 160px; height: 160px; }
 
-.home-row { position: absolute; left: 32px; right: 32px; bottom: 200px; display: flex; align-items: flex-end; justify-content: center; }
+.home-row { position: absolute; left: 32px; right: 32px; bottom: 200px; display: flex; align-items: flex-end; justify-content: center; opacity: 0; }
 .home-row[hidden] { display: none; }
+.home-row.panels-ready { animation: panels-in 320ms ease-out both; }
+@keyframes panels-in { from { opacity: 0; } to { opacity: 1; } }
 .home-row > .plate { width: 160px; height: 160px; z-index: 3; }
 .home-row .dock > .plate { display: none; }
 .home-panel { position: relative; flex: 0 0 auto; }

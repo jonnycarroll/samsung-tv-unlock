@@ -49,6 +49,7 @@
   var DIAGNOSTICS = false; // in-app perf/dump beacons; off in normal builds
   var SELF = "tvunlock02.Launcher";
   var APPLE_TV_APP = "com.samsung.tv.aria-video";
+  var INTERNET_APPS = ["org.tizen.browser", "com.samsung.tv.knox-browser"];
   var SETTINGS_APP = "com.samsung.tv.coba.setting";
   var SAMSUNG_HOME = "com.samsung.tv.csfs";
   var NETWORK_SETTINGS = "org.tizen.NetworkSetting-Tizen";
@@ -56,7 +57,6 @@
   var LIVETV_APP = "com.samsung.tv.coba.livetv";
   var STORE_KEY = "cleanhome.v2";
   var MAX_DOCK = 5;
-  var DEFAULT_DOCK_COUNT = 4;
   var GRID_COLS = 6;
   var ROW_H = 178;
 
@@ -76,15 +76,6 @@
     { id: "CXNLCPYe82.dstvnow", name: "DStv Stream", iconPath: "icons/apps/dstv.png" },
     { id: "org.tizen.browser", name: "Internet", iconPath: "icons/apps/internet.png" },
     { id: "com.samsung.tv.coba.livetv", name: "LiveTV" }
-  ];
-
-  /* The dock the viewer asked for. Ids first, names as a fallback. */
-  var DEFAULT_IDS = [
-    "9Ur5IzDKqV.TizenYouTube", "org.tizen.netflix-app", "org.tizen.primevideo",
-    "CXNLCPYe82.dstvnow", "rJeHak5zRg.Spotify", "kIciSQlYEM.plex", "org.tizen.browser"
-  ];
-  var DEFAULT_NAMES = [
-    "YouTube", "Netflix", "Prime Video", "DStv Stream", "Spotify", "Plex", "Internet"
   ];
 
   var BRANDS = [
@@ -641,23 +632,15 @@
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (!raw) {
-        return { dock: [], seeded: false, theme: "obsidian", showAll: false,
-                 dockOrder: false, allReset: false, liveTvInDock: false, sparseDockFixed: false };
+        return { dock: [], theme: "obsidian" };
       }
       var parsed = JSON.parse(raw);
       return {
         dock: Array.isArray(parsed.dock) ? parsed.dock : [],
-        seeded: !!parsed.seeded || (Array.isArray(parsed.dock) && parsed.dock.length > 0),
-        theme: typeof parsed.theme === "string" ? parsed.theme : "obsidian",
-        showAll: !!parsed.showAll,
-        dockOrder: !!parsed.dockOrder,
-        allReset: !!parsed.allReset,
-        liveTvInDock: !!parsed.liveTvInDock,
-        sparseDockFixed: !!parsed.sparseDockFixed
+        theme: typeof parsed.theme === "string" ? parsed.theme : "obsidian"
       };
     } catch (e) {
-      return { dock: [], seeded: false, theme: "obsidian", showAll: false,
-               dockOrder: false, allReset: false, liveTvInDock: false, sparseDockFixed: false };
+      return { dock: [], theme: "obsidian" };
     }
   }
 
@@ -775,7 +758,8 @@
     if (/-dummy$/.test(app.id)) return false;
 
     // The TV's own "show in the app list" flag is the best first filter.
-    if ((app.show === false || app.show === "false") && app.id !== APPLE_TV_APP) return false;
+    if ((app.show === false || app.show === "false") && app.id !== APPLE_TV_APP &&
+        INTERNET_APPS.indexOf(app.id) < 0) return false;
 
     // Known brands always pass, whatever shape their id has.
     if (isKnownBrand(app.name)) return true;
@@ -786,17 +770,6 @@
     if (/(?:service|worker|plugin|preview|promotion|launcher|test|sdk|daemon|factory|sample)/i
         .test(app.name)) return false;
     return true;
-  }
-
-  function findByExactName(apps, name) {
-    var wanted = name.toLowerCase();
-    for (var i = 0; i < apps.length; i++) {
-      if (apps[i].name.toLowerCase() === wanted) return apps[i];
-    }
-    for (var j = 0; j < apps.length; j++) {
-      if (apps[j].name.toLowerCase().indexOf(wanted) === 0) return apps[j];
-    }
-    return null;
   }
 
   /* Never on the dock, whatever the saved config says. e-Manual is the one that
@@ -816,34 +789,9 @@
     apps.forEach(function (a) { byId[a.id] = a; });
     var picked = [];
     (ids || []).forEach(function (id) {
-      if (id === SETTINGS_APP || id === LIVETV_APP || id === SOURCE_APP) return;
       if (byId[id] && picked.indexOf(byId[id]) < 0 && !blockedOnHome(byId[id])) picked.push(byId[id]);
     });
     return picked.slice(0, MAX_DOCK);
-  }
-
-  function findById(apps, id) {
-    for (var i = 0; i < apps.length; i++) {
-      if (apps[i].id === id) return apps[i];
-    }
-    return null;
-  }
-
-  function defaultDock(apps, limit) {
-    limit = limit || DEFAULT_DOCK_COUNT;
-    var chosen = [];
-    DEFAULT_IDS.forEach(function (id, index) {
-      var hit = findById(apps, id) || findByExactName(apps, DEFAULT_NAMES[index]);
-      if (hit && chosen.indexOf(hit) < 0) chosen.push(hit);
-    });
-
-    // Fill remaining Home slots with curated apps.
-    apps.forEach(function (app) {
-      if (chosen.length < limit && chosen.indexOf(app) < 0 &&
-          app.id !== SETTINGS_APP && app.id !== LIVETV_APP && app.id !== SOURCE_APP &&
-          !blockedOnHome(app) && isCurated(app)) chosen.push(app);
-    });
-    return chosen.slice(0, limit);
   }
 
   // ---------------------------------------------------------------- render
@@ -1430,7 +1378,6 @@
       toast("Added to Home");
     }
     store.dock = ids;
-    store.seeded = true;
     saveStore();
     state.dock = resolveDock(state.apps, ids);
     state.dockIndex = Math.min(state.dockIndex, lastDockIndex());
@@ -2367,6 +2314,7 @@
     "prime video": "org.tizen.primevideo",
     "spotify": "rJeHak5zRg.Spotify",
     "plex": "kIciSQlYEM.plex",
+    "internet": "org.tizen.browser",
     "globoplay": "org.tizen.globoplayapp"
   };
 
@@ -2376,13 +2324,14 @@
   /* Brands the viewer actually uses. Other store apps still pass the
    * non-Samsung rule below, so a future Disney+ install shows up anyway. */
   var BRAND_PREFIXES = [
-    "netflix", "youtube", "prime video", "spotify", "plex", "dstv"
+    "netflix", "youtube", "prime video", "spotify", "plex", "dstv", "internet"
   ];
 
   /* Samsung apps worth keeping in All apps. Everything else Samsung ships is
    * hidden behind the "Show all apps" tile. */
   var SAMSUNG_KEEP = [
     APPLE_TV_APP,
+    INTERNET_APPS[0], INTERNET_APPS[1],
     "com.samsung.tv.gallery",
     "org.tizen.ambientapp",
     "com.samsung.tv.coba.livetv"
@@ -2465,7 +2414,7 @@
     return dedupeBrands(state.apps.filter(isCurated));
   }
 
-  var APPS_CACHE = "cleanhome.apps.v2";
+  var APPS_CACHE = "cleanhome.apps.v3";
   var CACHE_MAX_AGE = 6 * 60 * 60 * 1000;
 
   function readAppsCache() {
@@ -2495,47 +2444,13 @@
   }
 
   function adopt(apps) {
-    // Older cold starts could save preview-only numeric IDs before the TV's
-    // real app list arrived. Replace that dock with actual installed apps.
-    if (hasTizen() && store.dock.some(function (id) {
-      return DEMO_APPS.some(function (demo) { return demo.id === id && /^\d+$/.test(id); });
-    })) {
-      store.dock = [];
-      store.seeded = false;
-      store.dockOrder = false;
-    }
-    if (!store.allReset) {
-      store.showAll = false;
-      store.allReset = true;
-      saveStore();
-    }
     state.apps = apps;
     state.grid = visibleApps();
-
-    // An older build silently appended a default app to a four-app saved dock.
-    if (!store.sparseDockFixed) {
-      if (store.dock.length === MAX_DOCK) {
-        var priorDefaults = defaultDock(apps, MAX_DOCK);
-        var filler = priorDefaults.filter(function (app) {
-          return store.dock.slice(0, MAX_DOCK - 1).indexOf(app.id) < 0;
-        })[0];
-        if (filler && filler.id === store.dock[MAX_DOCK - 1]) store.dock.pop();
-      }
-      store.sparseDockFixed = true;
-      saveStore();
-    }
-
-    if (store.seeded && store.dockOrder) {
-      state.dock = resolveDock(apps, store.dock);
-    } else {
-      state.dock = defaultDock(apps);
-      store.dock = state.dock.map(function (a) { return a.id; });
-      store.seeded = true;
-      store.dockOrder = true;
-      saveStore();
-    }
-
+    // Home contains only apps the viewer explicitly saved. Unknown IDs from
+    // older preview builds are discarded without picking replacements.
+    state.dock = resolveDock(apps, store.dock);
     store.dock = state.dock.map(function (a) { return a.id; });
+    saveStore();
     state.dockIndex = Math.min(state.dockIndex, lastDockIndex());
 
     el.empty.hidden = apps.length > 0;
@@ -2546,6 +2461,9 @@
     renderDock();
     renderGrid();
     paintFocus();
+    if (el.sources.querySelector(".tile") && el.dock.querySelector(".tile")) {
+      el.homeRow.classList.add("panels-ready");
+    }
   }
 
   function fetchApps() {
@@ -2560,6 +2478,9 @@
       el.empty.hidden = false;
       el.emptyText.textContent = "Could not read the app list: " +
         (err && err.message ? err.message : "unknown error");
+      renderDock();
+      paintFocus();
+      el.homeRow.classList.add("panels-ready");
     });
   }
 
@@ -2586,12 +2507,8 @@
       return;
     }
 
-    // Show the empty Home actions while the TV enumerates its real apps.
-    // Preview apps are only for browsers without the Tizen API.
+    // Keep the Home panels hidden until the TV returns its installed apps.
     renderUtils();
-    renderDock();
-    renderGrid();
-    paintFocus();
     setTimeout(fetchApps, 120);
   }
 
