@@ -1161,30 +1161,38 @@
     state.dock.forEach(function (app, index) {
       el.dock.appendChild(tile(app, index));
     });
-    var emptyDock = state.dock.length === 0;
-    var all = document.createElement("div");
-    all.className = "tile " + (emptyDock ? "edit-home-tile" : "all-apps-tile");
-    all.setAttribute("data-index", state.dock.length);
-    var icon;
-    if (emptyDock) {
-      icon = document.createElement("img");
-      icon.src = "icons/edit-apps.svg";
-      icon.alt = "";
-    } else {
-      icon = document.createElement("div");
-      icon.className = "all-apps-icon";
-      for (var i = 0; i < 4; i++) icon.appendChild(document.createElement("span"));
+    if (!state.dock.length) {
+      var edit = document.createElement("div");
+      edit.className = "tile edit-home-tile";
+      edit.setAttribute("data-index", 0);
+      var editIcon = document.createElement("img");
+      editIcon.src = "icons/edit-apps.svg";
+      editIcon.alt = "";
+      edit.appendChild(editIcon);
+      var editLabel = document.createElement("div");
+      editLabel.className = "name";
+      editLabel.textContent = "Edit Home";
+      edit.appendChild(editLabel);
+      el.dock.appendChild(edit);
     }
+    var all = document.createElement("div");
+    all.className = "tile all-apps-tile";
+    all.setAttribute("data-index", lastDockIndex());
+    var icon = document.createElement("div");
+    icon.className = "all-apps-icon";
+    for (var i = 0; i < 4; i++) icon.appendChild(document.createElement("span"));
     all.appendChild(icon);
     var label = document.createElement("div");
     label.className = "name";
-    label.textContent = emptyDock ? "Edit Home" : "All Apps";
+    label.textContent = "All Apps";
     all.appendChild(label);
     el.dock.appendChild(all);
     el.dockPlate = document.createElement("div");
     el.dockPlate.className = "plate";
     el.dock.appendChild(el.dockPlate);
   }
+
+  function lastDockIndex() { return state.dock.length || 1; }
 
   function renderGrid() {
     el.grid.innerHTML = "";
@@ -1373,7 +1381,9 @@
     var current = state.dock[state.dockIndex];
     setGlow(current);
     setStack(el.eyebrowStack, state.reordering ? "reorder" : "home");
-    showTitle("dock", state.dock.map(function (a) { return labelFor(a); }).concat([state.dock.length ? "All Apps" : "Edit Home"]), state.dockIndex);
+    var dockTitles = state.dock.map(function (a) { return labelFor(a); })
+      .concat(state.dock.length ? ["All Apps"] : ["Edit Home", "All Apps"]);
+    showTitle("dock:" + dockTitles.join("|"), dockTitles, state.dockIndex);
     setStack(el.subStack, state.reordering ? "reorder" : "home");
   }
 
@@ -1423,9 +1433,13 @@
     store.seeded = true;
     saveStore();
     state.dock = resolveDock(state.apps, ids);
-    state.dockIndex = Math.min(state.dockIndex, state.dock.length);
+    state.dockIndex = Math.min(state.dockIndex, lastDockIndex());
     renderDock();
-    renderGrid();
+    var gridTile = el.grid.children[state.gridIndex];
+    if (gridTile) {
+      if (ids.indexOf(app.id) >= 0) gridTile.classList.add("on-home");
+      else gridTile.classList.remove("on-home");
+    }
     paintFocus();
   }
 
@@ -1786,7 +1800,8 @@
       if (util.key === "controls") { openControls(); return; }
       return;
     }
-    if (state.dockIndex === state.dock.length) { showGrid(state.dock.length === 0); return; }
+    if (!state.dock.length && state.dockIndex === 0) { showGrid(true); return; }
+    if (state.dockIndex === lastDockIndex()) { showGrid(false); return; }
     launch(state.dock[state.dockIndex]);
   }
 
@@ -1878,7 +1893,7 @@
       if (key === 37 && state.sourceIndex === 0) {
         state.zone = "dock";
         state.returnZone = "dock";
-        state.dockIndex = state.dock.length;
+        state.dockIndex = lastDockIndex();
         paintFocus();
         return;
       }
@@ -1919,8 +1934,8 @@
     }
 
     if (key === 37) state.dockIndex = Math.max(0, state.dockIndex - 1);
-    if (key === 39 && state.dockIndex === state.dock.length) { showSources(); return; }
-    if (key === 39) state.dockIndex = Math.min(state.dock.length, state.dockIndex + 1);
+    if (key === 39 && state.dockIndex === lastDockIndex()) { showSources(); return; }
+    if (key === 39) state.dockIndex = Math.min(lastDockIndex(), state.dockIndex + 1);
     if (key === 38) {
       state.returnZone = "dock";
       if (np && np.title) state.zone = "card";
@@ -2510,7 +2525,7 @@
     }
 
     store.dock = state.dock.map(function (a) { return a.id; });
-    state.dockIndex = Math.min(state.dockIndex, state.dock.length);
+    state.dockIndex = Math.min(state.dockIndex, lastDockIndex());
 
     el.empty.hidden = apps.length > 0;
     if (!apps.length) el.emptyText.textContent = "The TV returned an empty app list.";
