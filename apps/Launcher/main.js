@@ -132,6 +132,9 @@
     videoSources: null,
     videoWindowOpen: false,
     sourceIndex: 0,
+    hdmiMenuOpen: false,
+    hdmiMenuDismissed: false,
+    hdmiIndex: 0,
     returnZone: "dock",
     gridIndex: 0,
     apps: [],
@@ -164,6 +167,7 @@
     homeRow: document.getElementById("home-row"),
     homePlate: document.getElementById("home-plate"),
     sources: document.getElementById("sources"),
+    hdmiMenu: document.getElementById("hdmi-menu"),
     sourcesPlate: document.getElementById("sources-plate"),
     gridPlate: document.getElementById("grid-plate"),
     gridViewport: document.getElementById("grid-viewport"),
@@ -203,7 +207,6 @@
   var PAUSE_ICON = '<svg viewBox="0 0 24 24" width="30" height="30" fill="#f3f5f8"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
   var np = null;
   var npTimer = null;
-  var gridFadeTimer = null;
 
   var WALLPAPERS = [{ id: "off", name: "Off" }];
   var wallpaperIndex = 0;
@@ -1077,7 +1080,7 @@
     } catch (e) { state.videoSources = null; renderSources(); }
   }
 
-  function sourceItems() {
+  function connectedHdmiItems() {
     var items = [];
     var ports = [];
     for (var i = 0; state.videoSources && i < state.videoSources.length; i++) {
@@ -1090,8 +1093,40 @@
     for (var j = 0; j < ports.length; j++) {
       items.push({ key: "HDMI" + ports[j], label: "HDMI " + ports[j], icon: "icons/hdmi.svg" });
     }
+    return items;
+  }
+
+  function sourceItems() {
+    var hdmi = connectedHdmiItems();
+    var items = hdmi.length > 1
+      ? [{ key: "HDMI_MENU", label: "HDMI (" + hdmi.length + ")", icon: "icons/hdmi.svg" }]
+      : hdmi.slice();
     items.push({ key: "TV", label: "Live TV", icon: "icons/tv.svg" });
     return items;
+  }
+
+  function renderHdmiMenu() {
+    var items = connectedHdmiItems();
+    if (!state.hdmiMenuOpen || items.length < 2) {
+      state.hdmiMenuOpen = false;
+      el.hdmiMenu.hidden = true;
+      return;
+    }
+    state.hdmiIndex = Math.min(state.hdmiIndex, items.length - 1);
+    el.hdmiMenu.innerHTML = "";
+    items.forEach(function (item, index) {
+      var option = document.createElement("div");
+      option.className = "hdmi-option" + (index === state.hdmiIndex ? " focus" : "");
+      var icon = document.createElement("img");
+      icon.src = item.icon;
+      icon.alt = "";
+      option.appendChild(icon);
+      var name = document.createElement("span");
+      name.textContent = item.label;
+      option.appendChild(name);
+      el.hdmiMenu.appendChild(option);
+    });
+    el.hdmiMenu.hidden = false;
   }
 
   function renderSources() {
@@ -1116,13 +1151,7 @@
     el.sourcesPlate = document.createElement("div");
     el.sourcesPlate.className = "plate";
     el.sources.appendChild(el.sourcesPlate);
-    updateHomeSpacing();
     if (state.zone === "sources") paintFocus();
-  }
-
-  function updateHomeSpacing() {
-    if (state.dock.length + 1 + sourceItems().length > 10) el.homeRow.classList.add("dense");
-    else el.homeRow.classList.remove("dense");
   }
 
   function renderDock() {
@@ -1146,7 +1175,6 @@
     el.dockPlate = document.createElement("div");
     el.dockPlate.className = "plate";
     el.dock.appendChild(el.dockPlate);
-    updateHomeSpacing();
   }
 
   function renderGrid() {
@@ -1170,7 +1198,7 @@
     if (!tile) { plate.style.opacity = "0"; return; }
     // Follow the focused tile's 8px lift exactly. The plate is the same size as
     // the tile, so a card that fills the tile hides it completely.
-    plate.style.transform = "translate(" + tile.offsetLeft + "px," + (tile.offsetTop - 8) + "px)";
+    plate.style.transform = "translate(" + tile.offsetLeft + "px," + (tile.offsetTop - 8) + "px) scale(1.04)";
     plate.style.opacity = "1";
   }
 
@@ -1182,7 +1210,7 @@
     var row = el.homeRow.getBoundingClientRect();
     var dock = tile.parentNode.getBoundingClientRect();
     plate.style.transform = "translate(" + (dock.left - row.left + tile.offsetLeft) + "px," +
-      (dock.top - row.top + tile.offsetTop - 8) + "px)";
+      (dock.top - row.top + tile.offsetTop - 8) + "px) scale(1.04)";
     plate.style.opacity = "1";
   }
 
@@ -1246,6 +1274,7 @@
   function paintFocus() {
     setGlow(null);
     if (el.npCard) el.npCard.classList.remove("focus");
+    if (state.zone !== "sources") { state.hdmiMenuOpen = false; el.hdmiMenu.hidden = true; }
     if (state.view !== "home" || (state.zone !== "dock" && state.zone !== "sources")) moveHomePlate(null);
     if (state.zone !== "sources") movePlate(el.sourcesPlate, null);
 
@@ -1308,13 +1337,20 @@
     if (state.zone === "sources") {
       var sourceNodes = el.sources.querySelectorAll(".tile");
       var sources = sourceItems();
+      if (sources[state.sourceIndex] && sources[state.sourceIndex].key === "HDMI_MENU" && !state.hdmiMenuDismissed) {
+        state.hdmiMenuOpen = true;
+      } else {
+        state.hdmiMenuOpen = false;
+      }
+      renderHdmiMenu();
       setFocusedTile(sourceNodes[state.sourceIndex]);
       moveHomePlate(sourceNodes[state.sourceIndex]);
       movePlate(el.dockPlate, null);
       setChips(el.utils, -1);
       setStack(el.eyebrowStack, "sources");
-      showTitle("sources:" + sources.map(function (s) { return s.key; }).join(","),
-        sources.map(function (s) { return s.label; }), state.sourceIndex);
+      var titleItems = state.hdmiMenuOpen ? connectedHdmiItems() : sources;
+      showTitle("sources:" + titleItems.map(function (s) { return s.key; }).join(","),
+        titleItems.map(function (s) { return s.label; }), state.hdmiMenuOpen ? state.hdmiIndex : state.sourceIndex);
       setStack(el.subStack, "sources");
       return;
     }
@@ -1335,15 +1371,7 @@
   function scrollGrid() {
     var row = Math.floor(state.gridIndex / state.columns);
     var offset = row * ROW_H;
-    if (gridFadeTimer) { clearTimeout(gridFadeTimer); gridFadeTimer = null; }
     el.grid.style.transform = offset ? "translateY(-" + offset + "px)" : "";
-    if (offset) el.gridViewport.classList.add("scrolled");
-    else if (el.gridViewport.classList.contains("scrolled")) {
-      gridFadeTimer = setTimeout(function () {
-        gridFadeTimer = null;
-        if (state.view === "grid" && state.gridIndex < state.columns) el.gridViewport.classList.remove("scrolled");
-      }, 220);
-    }
   }
 
   // ---------------------------------------------------------------- actions
@@ -1713,6 +1741,10 @@
     if (state.zone === "card") { openMusic(); return; }
     if (state.zone === "sources") {
       var source = sourceItems()[state.sourceIndex];
+      if (source && source.key === "HDMI_MENU") {
+        if (!state.hdmiMenuOpen) { state.hdmiMenuDismissed = false; state.hdmiMenuOpen = true; paintFocus(); return; }
+        source = connectedHdmiItems()[state.hdmiIndex];
+      }
       if (source) switchSource(source.key);
       return;
     }
@@ -1757,8 +1789,6 @@
     el.rail.hidden = true;
     el.gridViewport.hidden = false;
     el.grid.style.transform = "";
-    if (gridFadeTimer) { clearTimeout(gridFadeTimer); gridFadeTimer = null; }
-    el.gridViewport.classList.remove("scrolled");
     renderGrid();
     paintFocus();
   }
@@ -1769,8 +1799,6 @@
     state.zone = "dock";
     state.returnZone = "dock";
     el.gridViewport.hidden = true;
-    if (gridFadeTimer) { clearTimeout(gridFadeTimer); gridFadeTimer = null; }
-    el.gridViewport.classList.remove("scrolled");
     el.homeRow.hidden = false;
     el.dock.hidden = false;
     el.rail.hidden = true;
@@ -1782,10 +1810,13 @@
     state.zone = "sources";
     state.returnZone = "sources";
     state.sourceIndex = 0;
+    state.hdmiIndex = 0;
+    state.hdmiMenuDismissed = false;
     paintFocus();
   }
 
   function back() {
+    if (state.hdmiMenuOpen) { state.hdmiMenuOpen = false; state.hdmiMenuDismissed = true; paintFocus(); return; }
     if (state.zone === "sources") { state.zone = "dock"; state.returnZone = "dock"; paintFocus(); return; }
     if (state.view === "grid") { showHome(); return; }
     if (state.zone === "utils") { state.zone = state.returnZone === "sources" ? "sources" : "dock"; paintFocus(); return; }
@@ -1827,6 +1858,12 @@
     }
 
     if (state.zone === "sources") {
+      if (state.hdmiMenuOpen && (key === 38 || key === 40)) {
+        state.hdmiIndex = Math.max(0, Math.min(connectedHdmiItems().length - 1,
+          state.hdmiIndex + (key === 38 ? -1 : 1)));
+        paintFocus();
+        return;
+      }
       if (key === 37 && state.sourceIndex === 0) {
         state.zone = "dock";
         state.returnZone = "dock";
@@ -1836,6 +1873,7 @@
       }
       if (key === 37) state.sourceIndex--;
       if (key === 39) state.sourceIndex = Math.min(sourceItems().length - 1, state.sourceIndex + 1);
+      if (key === 37 || key === 39) state.hdmiMenuDismissed = false;
       if (key === 38) { state.returnZone = "sources"; state.zone = "utils"; state.utilIndex = 0; }
       paintFocus();
       return;
