@@ -526,7 +526,7 @@
 
   var CONTROLS = [
     { section: "EXPERIENCE" },
-    { key: "edit", label: "Edit Home", icon: "icons/gear.svg" },
+    { key: "edit", label: "Edit Home", icon: "icons/edit-apps.svg" },
     { key: "refresh", label: "Refresh Apps", icon: "icons/refresh.svg" },
     { key: "theme", label: "Theme", icon: "icons/theme.svg" },
     { key: "family-carousel", label: "Family carousel", icon: "icons/theme.svg" },
@@ -1161,16 +1161,24 @@
     state.dock.forEach(function (app, index) {
       el.dock.appendChild(tile(app, index));
     });
+    var emptyDock = state.dock.length === 0;
     var all = document.createElement("div");
-    all.className = "tile all-apps-tile";
+    all.className = "tile " + (emptyDock ? "edit-home-tile" : "all-apps-tile");
     all.setAttribute("data-index", state.dock.length);
-    var icon = document.createElement("div");
-    icon.className = "all-apps-icon";
-    for (var i = 0; i < 4; i++) icon.appendChild(document.createElement("span"));
+    var icon;
+    if (emptyDock) {
+      icon = document.createElement("img");
+      icon.src = "icons/edit-apps.svg";
+      icon.alt = "";
+    } else {
+      icon = document.createElement("div");
+      icon.className = "all-apps-icon";
+      for (var i = 0; i < 4; i++) icon.appendChild(document.createElement("span"));
+    }
     all.appendChild(icon);
     var label = document.createElement("div");
     label.className = "name";
-    label.textContent = "All Apps";
+    label.textContent = emptyDock ? "Edit Home" : "All Apps";
     all.appendChild(label);
     el.dock.appendChild(all);
     el.dockPlate = document.createElement("div");
@@ -1365,7 +1373,7 @@
     var current = state.dock[state.dockIndex];
     setGlow(current);
     setStack(el.eyebrowStack, state.reordering ? "reorder" : "home");
-    showTitle("dock", state.dock.map(function (a) { return labelFor(a); }).concat(["All Apps"]), state.dockIndex);
+    showTitle("dock", state.dock.map(function (a) { return labelFor(a); }).concat([state.dock.length ? "All Apps" : "Edit Home"]), state.dockIndex);
     setStack(el.subStack, state.reordering ? "reorder" : "home");
   }
 
@@ -1415,6 +1423,7 @@
     store.seeded = true;
     saveStore();
     state.dock = resolveDock(state.apps, ids);
+    state.dockIndex = Math.min(state.dockIndex, state.dock.length);
     renderDock();
     renderGrid();
     paintFocus();
@@ -1777,7 +1786,7 @@
       if (util.key === "controls") { openControls(); return; }
       return;
     }
-    if (state.dockIndex === state.dock.length) { showGrid(false); return; }
+    if (state.dockIndex === state.dock.length) { showGrid(state.dock.length === 0); return; }
     launch(state.dock[state.dockIndex]);
   }
 

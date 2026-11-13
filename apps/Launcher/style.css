@@ -253,10 +253,11 @@ html, body {
 .hdmi-option { height: 76px; margin: 4px 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #f3f5f8; font-size: 20px; }
 .hdmi-option img { width: 32px; height: 32px; margin-bottom: 2px; }
 .hdmi-option.focus { background: rgba(255,255,255,0.24); outline: 1px solid rgba(255,255,255,0.5); }
-.all-apps-tile { background: rgba(0,0,0,0.48); }
+.all-apps-tile, .edit-home-tile { background: rgba(0,0,0,0.48); }
 .all-apps-icon { display: grid; grid-template-columns: repeat(2, 25px); grid-template-rows: repeat(2, 25px); gap: 9px; transform: translateY(-10px); }
 .all-apps-icon span { display: block; border-radius: 6px; background: rgba(243,245,248,0.86); }
-.home-row #dock .all-apps-tile .name { display: block; opacity: 1; font-size: 20px; }
+.home-row #dock .all-apps-tile .name, .home-row #dock .edit-home-tile .name { display: block; opacity: 1; font-size: 20px; }
+.home-row #dock .edit-home-tile img { width: 72px; height: 72px; }
 .home-row #sources .tile { background: rgba(0,0,0,0.65); }
 .home-row #sources .tile .name { display: block; opacity: 1; font-size: 21px; }
 .home-row #sources .tile img { width: 72px; height: 72px; transform: translateY(-14px); }
