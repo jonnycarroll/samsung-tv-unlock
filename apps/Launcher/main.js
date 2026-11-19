@@ -1167,9 +1167,9 @@
     if (!plate || plate._tile === tile) return;
     plate._tile = tile;
     if (!tile) { plate.style.opacity = "0"; return; }
-    // Follow the focused tile's 8px lift exactly. The plate is the same size as
-    // the tile, so a card that fills the tile hides it completely.
-    plate.style.transform = "translate(" + tile.offsetLeft + "px," + (tile.offsetTop - 8) + "px) scale(1.04)";
+    // Extend the glass 4px past each edge of the lifted tile.
+    plate.style.transform = "translate(" + (tile.offsetLeft - 4) + "px," + (tile.offsetTop - 12) +
+      "px) translateY(var(--press-offset, 0px)) scale(var(--plate-scale, 1.04))";
     plate.style.opacity = "1";
   }
 
@@ -1178,10 +1178,13 @@
     if (!plate || (plate._tile === tile && !force)) return;
     plate._tile = tile;
     if (!tile) { plate.style.opacity = "0"; return; }
-    var row = el.homeRow.getBoundingClientRect();
-    var dock = tile.parentNode.getBoundingClientRect();
-    plate.style.transform = "translate(" + (dock.left - row.left + tile.offsetLeft) + "px," +
-      (dock.top - row.top + tile.offsetTop - 8) + "px) scale(1.04)";
+    var dock = tile.parentNode;
+    var panel = dock.parentNode;
+    // offsetLeft/Top are measured from the dock's padding edge; include its 1px border.
+    // Keep every offset in stage pixels so the plate stays centred when the stage is scaled.
+    plate.style.transform = "translate(" + (panel.offsetLeft + dock.offsetLeft + dock.clientLeft + tile.offsetLeft - 4) + "px," +
+      (panel.offsetTop + dock.offsetTop + dock.clientTop + tile.offsetTop - 12) +
+      "px) translateY(var(--press-offset, 0px)) scale(var(--plate-scale, 1.04))";
     plate.style.opacity = "1";
   }
 
@@ -1220,11 +1223,20 @@
 
   function setFocusedTile(node) {
     if (state.focusedTile === node) return;
+    if (state.focusedTile && state.focusedTile.classList.contains("pressed")) pressFocusedTile(false);
     if (state.focusedTile) {
-      state.focusedTile.className = state.focusedTile.className.replace(/\s*focus/g, "");
+      state.focusedTile.classList.remove("focus", "pressed");
     }
     if (node) node.className += " focus";
     state.focusedTile = node;
+  }
+
+  function pressFocusedTile(pressed) {
+    var tile = state.focusedTile;
+    if (!tile) return;
+    var plate = state.view === "grid" ? el.gridPlate : el.homePlate;
+    tile.classList.toggle("pressed", pressed);
+    if (plate) plate.classList.toggle("pressed", pressed);
   }
 
   function setChips(container, index) {
@@ -1928,6 +1940,9 @@
 
   function onKeyDown(event) {
     var key = event.keyCode;
+    if (key !== 13 && state.focusedTile && state.focusedTile.classList.contains("pressed")) {
+      pressFocusedTile(false);
+    }
 
     if (state.videoWindowOpen) {
       if (key === 10009 || key === 27) {
@@ -1983,6 +1998,7 @@
     if (key === 13) {
       event.preventDefault();
       if (state.reordering) {
+        pressFocusedTile(false);
         state.suppressActivate = true;
         lockReorder();
         return;
@@ -1992,10 +2008,12 @@
         return;
       }
       state.holdFired = false;
+      pressFocusedTile(true);
       clearTimeout(state.holdTimer);
       state.holdTimer = setTimeout(function () {
         if (state.view === "home" && state.zone === "dock" && state.dockIndex < state.dock.length) {
           state.holdFired = true;
+          pressFocusedTile(false);
           enterReorder();
         }
       }, 600);
@@ -2013,6 +2031,7 @@
 
   function onKeyUp(event) {
     if (event.keyCode !== 13) return;
+    pressFocusedTile(false);
     if (state.videoWindowOpen) return;
     if (state.musicOpen) { musicActivate(); event.preventDefault(); return; }
     clearTimeout(state.holdTimer);
